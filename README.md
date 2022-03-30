@@ -15,17 +15,19 @@ By default there is little/no output to stdout or stderr until the script has fi
 When using `jellyfin.py`, the results can be saved to `json` using the `-j` parameter. These will be saved in a sub-directory in `pwd`. Saving the results as json also allows them to be checked in subsequent runs to skip already processed files.
 
 ## Running Docker
-  ## Scanner
-  'docker run -d \
+  ### Scanner
+  ```
+  docker run -d \
   --name=Jellyfin-intro-Scanner \
   -e JELLYFIN_URL=http://Jellyfin:port
   -e JELLYFIN_USERNAME=username
   -e JELLYFIN_PASSWORD=password
   -v /path/to/tv/shows/on/host:/path/to/tv/shows/on/Jellyfin/docker/container \
   --restart unless-stopped \
-  mueslimak3r/tv-intro-detection:latest'
+  mueslimak3r/tv-intro-detection:latest
+  ```
   
-  ## Auto Skipper
+  ### Auto Skipper
 
 ## Examples
 scan your jellyfin library, store the result in json, debug logging enabled
