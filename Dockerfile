@@ -6,3 +6,5 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 WORKDIR /app
 ENTRYPOINT ["python"]
 CMD [ "jellyfin.py -d -j" ]
+
+VOLUME /config
