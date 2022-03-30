@@ -5,6 +5,6 @@ RUN apt-get install -y ffmpeg libsm6 libxext6
 RUN pip install --no-cache-dir -r /app/requirements.txt
 WORKDIR /app
 ENTRYPOINT ["python"]
-CMD [ "/app/jellyfin.py -d -j" ]
+CMD ["/app/jellyfin.py" "-d" "-j"]
 
 VOLUME /config
