@@ -5,4 +5,4 @@ RUN apt-get install -y ffmpeg libsm6 libxext6
 RUN pip install --no-cache-dir -r /tv-intro-detection/requirements.txt
 WORKDIR /tv-intro-detection
 ENTRYPOINT ["python"]
-CMD [ "/tv-intro-detection/jellyfin.py -d -j" ]
+CMD [ "jellyfin.py -d -j" ]
