@@ -15,7 +15,7 @@ on:
 
 env:
   IMAGE_NAME: jellyfin-tv-intro-detection
-  VERSION: 0.0.2
+  #VERSION: 0.0.2
 
 jobs:
   # Push image to GitHub Packages.
