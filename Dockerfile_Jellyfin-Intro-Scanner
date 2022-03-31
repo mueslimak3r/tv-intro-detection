@@ -7,4 +7,4 @@ WORKDIR /app
 ENTRYPOINT ["python"]
 CMD [ "jellyfin.py", "-d", "-j" ]
 
-VOLUME /config
+VOLUME /app/config
