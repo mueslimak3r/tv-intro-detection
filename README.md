@@ -17,16 +17,18 @@ When using `jellyfin.py`, the results can be saved to `json` using the `-j` para
 ## Running Docker
   ### Scanner
   ```
-  docker run -d \
-  --name=Jellyfin-intro-Scanner \
-  -e JELLYFIN_URL=http://Jellyfin:port \
-  -e JELLYFIN_USERNAME=username \
-  -e JELLYFIN_PASSWORD='password' \
-  -v /path/to/tv/shows/on/host:/path/to/tv/shows/on/Jellyfin/docker/container \
-  #-v /path/to/config:/config \
-  --network=jellyfin-network \
-  --restart unless-stopped \
-  ghcr.io/mueslimak3r/tv-intro-detection:latest
+docker run -d \
+    --name=Jellyfin-Intro-Scanner \
+    -e JELLYFIN_URL=http://Jellyfin:port \
+    -e JELLYFIN_USERNAME=username \
+    -e JELLYFIN_PASSWORD='password' \
+    #-e CONFIG_DIR=/config \       # Optional, pointless to change the config dir in the docker container, but there if needed.
+    #-e DATA_DIR=/config/data \    # Optional, pointless to change the data dir in the docker container, but there if needed.
+    -v /path/to/media/on/host:/path/to/media/on/Jellyfin/container \  # If you use the same volume path for your Jellyfin container, you don't to edit path_map.txt in /config.
+    -v /path/to/config:/app/config \
+    --network=jellyfin-network \
+    --restart unless-stopped \
+    ghcr.io/mueslimak3r/jellyfin-tv-intro-detection:latest
   ```
   
   ### Auto Skipper
