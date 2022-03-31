@@ -1,19 +1,15 @@
 name: Build & Push Jellyfin Intro Scanner & Skipper
 
 on:   
-  pull_request:
+  push:
     branches:
       - master
-
-    # Publish `v1.2.3` tags as releases.
-    tags:
-      - v*
-
-  # Run tests for any PRs.
+      
   pull_request:
 
 env:
-  IMAGE_NAME: jellyfin-tv-intro-detection
+  IMAGE_NAME_Scanner: jellyfin-intro-scanner
+  IMAGE_NAME_Skipper: jellyfin-intro-skipper
   #VERSION: 0.0.2
 
 jobs:
@@ -35,7 +31,7 @@ jobs:
 
       - name: Push image
         run: |
-          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME_Scanner
 
           # Change all uppercase to lowercase
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
@@ -47,7 +43,7 @@ jobs:
           [ "$VERSION" == "master" ] && VERSION=latest
           echo IMAGE_ID=$IMAGE_ID
           echo VERSION=$VERSION
-          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker tag $IMAGE_NAME_Scanner $IMAGE_ID:$VERSION
           docker push $IMAGE_ID:$VERSION
           
   Skipper_Build_and_Push:
@@ -68,7 +64,7 @@ jobs:
 
       - name: Push image
         run: |
-          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME
+          IMAGE_ID=ghcr.io/${{ github.repository_owner }}/$IMAGE_NAME_Skipper
 
           # Change all uppercase to lowercase
           IMAGE_ID=$(echo $IMAGE_ID | tr '[A-Z]' '[a-z]')
@@ -80,5 +76,5 @@ jobs:
           [ "$VERSION" == "master" ] && VERSION=latest
           echo IMAGE_ID=$IMAGE_ID
           echo VERSION=$VERSION
-          docker tag $IMAGE_NAME $IMAGE_ID:$VERSION
+          docker tag $IMAGE_NAME_Skipper $IMAGE_ID:$VERSION
           docker push $IMAGE_ID:$VERSION
