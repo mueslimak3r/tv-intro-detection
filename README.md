@@ -87,16 +87,16 @@ services:
 ```
 
 ## Examples
-scan your jellyfin library, store the result in json, debug logging enabled
+scan your jellyfin library, store the result in json, debug logging enabled, logging debug output to file enabled
 
-`jellyfin.py -d -j`
+`jellyfin.py -j -d -l`
 
 monitor your jellyfin sessions and automatically skip intros using the stored json data
 
 `jellyfin_auto_skip.py`
 
-manually scan a directory containing at least 2 video files, debug logging enabled, delete fingerpring data afterward
-`decode.py -d -c -i /path/to/tv/season`
+manually scan a directory containing at least 2 video files, debug logging enabled, logging debug output to file enabled, delete fingerprint data afterward
+`decode.py -i /path/to/tv/season -d -l -c`
 
 make the script aware of your host:container path mapping by editing `path_map.txt`
 
