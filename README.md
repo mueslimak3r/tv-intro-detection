@@ -14,24 +14,77 @@ By default there is little/no output to stdout or stderr until the script has fi
 
 When using `jellyfin.py`, the results can be saved to `json` using the `-j` parameter. These will be saved in a sub-directory in `pwd`. Saving the results as json also allows them to be checked in subsequent runs to skip already processed files.
 
-## Running Docker
-  ### Scanner
-  ```
+## Running in Docker
+  ### Parameters
+
+|| Parameter  | Function |
+| ---                                        | ---                                        | ---       |
+| Required | ```-e JELLYFIN_URL=http://Jellyfin:port``` | Jellyfin URL         |
+| Required | ```-e JELLYFIN_USERNAME=username```        | Jellyfin User Username        |
+| Required | ```-e JELLYFIN_PASSWORD='password'```      | Jellyfin User Password         |
+| Required | ```-v /path/to/config:/app/config```      | Location of config/data on disk. Must be the same location for Jellyfin-Intro-Scanner & Jellyfin-Intro-Skipper        |
+| Required | ```-v /path/to/media/on/host:/path/to/media/on/Jellyfin/container'```      |  Location of media library on disk. If you use the same volume path for your Jellyfin container, you don't to edit ```path_map.txt``` in your ```/config``` folder. If you need to change it you must first create a ```path_map.txt``` in your ```/config``` folder.        |
+| Optional | ```-e CONFIG_DIR=/config```      |  Pointless to change the data directory in the docker container, but it's there if needed. If you do decide to add this make sure to update your ```/app/config``` path mapping.          |
+| Optional | ```-e DATA_DIR=/config/data'```      | Pointless to change the data directory in the docker container, but it's there if needed. If you do decide to add this make sure to update your ```/app/config``` path mapping.         |
+
+  ### Scanner - Docker Run
+```
 docker run -d \
     --name=Jellyfin-Intro-Scanner \
     -e JELLYFIN_URL=http://Jellyfin:port \
     -e JELLYFIN_USERNAME=username \
     -e JELLYFIN_PASSWORD='password' \
-    #-e CONFIG_DIR=/config \       # Optional, pointless to change the config dir in the docker container, but there if needed.
-    #-e DATA_DIR=/config/data \    # Optional, pointless to change the data dir in the docker container, but there if needed.
-    -v /path/to/media/on/host:/path/to/media/on/Jellyfin/container \  # If you use the same volume path for your Jellyfin container, you don't to edit path_map.txt in /config.
+    -v /path/to/media/on/host:/path/to/media/on/Jellyfin/container \
     -v /path/to/config:/app/config \
     --network=jellyfin-network \
     --restart unless-stopped \
-    ghcr.io/mueslimak3r/jellyfin-tv-intro-detection:latest
-  ```
-  
-  ### Auto Skipper
+    ghcr.io/mueslimak3r/jellyfin-intro-scanner:latest
+```
+  ### Skipper - Docker Run
+```
+docker run -d \
+  --name=Jellyfin-Intro-Skipper \
+  -e JELLYFIN_URL=http://Jellyfin:port \
+  -e JELLYFIN_USERNAME=username \
+  -e JELLYFIN_PASSWORD='password' \
+  -v /path/to/config:/app/config \
+  --network=jellyfin-network \
+  --restart unless-stopped \
+  ghcr.io/mueslimak3r/jellyfin-intro-skipper:latest
+```
+  ### Scanner & Skipper - Docker Compose
+```
+---
+version: "3.8"
+
+services:
+  Jellyfin-Intro-Scanner:
+    image: ghcr.io/mueslimak3r/jellyfin-intro-scanner:latest
+    depends_on:
+	- Jellyfin
+    container_name: Jellyfin-Intro-Scanner
+    environment:
+      - JELLYFIN_URL=http://Jellyfin:port
+      - JELLYFIN_USERNAME=username
+      - JELLYFIN_PASSWORD='password'
+    volumes:
+      - /path/to/media/on/host:/path/to/media/on/Jellyfin/container
+	- /path/to/config:/app/config
+    restart: unless-stopped
+
+  Jellyfin-Intro-Skipper:
+    image: ghcr.io/mueslimak3r/jellyfin-intro-skipper:latest
+    depends_on:
+	- Jellyfin
+    container_name: Jellyfin-Intro-Skipper
+    environment:
+      - JELLYFIN_URL=http://Jellyfin:port
+      - JELLYFIN_USERNAME=username
+      - JELLYFIN_PASSWORD='password'
+    volumes:
+	- /path/to/config:/app/config
+    restart: unless-stopped
+```
 
 ## Examples
 scan your jellyfin library, store the result in json, debug logging enabled
