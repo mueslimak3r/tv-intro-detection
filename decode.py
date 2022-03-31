@@ -22,11 +22,15 @@ FIRST = 0
 SECOND = 1
 BOTH = 2
 
+config_path = os.environ['CONFIG_DIR'] if 'CONFIG_DIR' in os.environ else './config'
+data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else os.path.join(config_path, 'data')
+
 preroll_seconds = 0 # adjust the end time to return n seconds prior to the calculated end time
                     # jellyfin_auto_skip.py also handles pre-roll so adjust it there
                     # adjusting it here bakes the pre-rolled value into the result
 max_fingerprint_mins = 10
 min_intro_length_sec = 10
+max_intro_length_sec = 180
 check_frame = 10  # 1 (slow) to 10 (fast) is fine 
 workers = 4 # number of executors to use
 target_image_height = 180 # scale frames to height of 180px
@@ -42,7 +46,7 @@ def dict_by_value(dict, value):
             return name
 
 def write_fingerprint(path, fingerprint):
-    path = "fingerprints/" + replace(path) + "/fingerprint.txt"
+    path = os.path.join(data_path, "fingerprints/" + replace(path) + "/fingerprint.txt")
     with open(path, "w+") as text_file:
         text_file.write(fingerprint)
 
@@ -109,10 +113,10 @@ def get_or_create_fingerprint(file, cleanup, log_level):
     profile['total_frames'] = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
     video.release()
 
-    if os.path.exists("fingerprints/" + replace(file) + "/fingerprint.txt"):
+    if os.path.exists(os.path.join(data_path, "fingerprints/" + replace(file) + "/fingerprint.txt")):
         if log_level > 0:
             print_debug('loading existing fingerprint for [%s]' % file)
-        with open("fingerprints/" + replace(file) + "/fingerprint.txt", "r") as text_file:
+        with open(os.path.join(data_path, "fingerprints/" + replace(file) + "/fingerprint.txt"), "r") as text_file:
             fingerprint = text_file.read()
     else:
         if log_level > 0:
@@ -154,8 +158,8 @@ def save_season_fingerprint(fingerprints, profiles, ndx, filtered_lengths, log_l
     season_fingerprint['average_frames'] = average
     season_fingerprint['average_sample_size'] = len(filtered_lengths)
 
-    path = "fingerprints/" + name + ".json"
-    Path("fingerprints/").mkdir(parents=True, exist_ok=True)
+    path = os.path.join(data_path, "fingerprints/" + name + ".json")
+    Path(os.path.join(data_path, "fingerprints")).mkdir(parents=True, exist_ok=True)
     with open(path, "w+") as json_file:
         json.dump(season_fingerprint, json_file, indent = 4)
 
@@ -175,6 +179,9 @@ def reject_outliers(data, m = 1.):
     return output
 '''
 def reject_outliers(input_list, iq_range=0.2):
+    if not input_list:
+        return input_list
+
     sr = pandas.Series(input_list, copy=True)
     pcnt = (1 - iq_range) / 2
     qlow, median, qhigh = sr.dropna().quantile([pcnt, 0.50, 1-pcnt])
@@ -186,7 +193,8 @@ def correct_errors(fingerprints, profiles, log_level):
     # build a list of intro lengths with outliers rejected
     lengths = []
     for profile in profiles:
-        lengths.append(profile['end_frame'] - profile['start_frame'])
+        if profile['end_frame'] - profile['start_frame'] > 0 and profile['end_frame'] - profile['start_frame'] <= int(profile['fps'] * max_intro_length_sec):
+            lengths.append(profile['end_frame'] - profile['start_frame'])
     filtered_lengths = reject_outliers(lengths)
 
     if len(filtered_lengths) < 1:
@@ -222,7 +230,7 @@ def correct_errors(fingerprints, profiles, log_level):
         else:
             print_debug('\nrejected file [%s] with start %s end %s' % (profiles[ndx]['path'], profiles[ndx]['start_frame'], profiles[ndx]['end_frame']))
             print_timestamp(profiles[ndx]['path'], profiles[ndx]['start_frame'], profiles[ndx]['end_frame'], profiles[ndx]['fps'])
-            with open('rejects.txt', "a") as logger:
+            with open(os.path.join(data_path, 'rejects.txt'), "a") as logger:
                 logger.write('rejected file [%s] diff from average %s start %s end %s average %s fps %s\n' % (profiles[ndx]['path'], diff_from_avg, profiles[ndx]['start_frame'], profiles[ndx]['end_frame'], average, profiles[ndx]['fps']))
             non_conforming_profiles.append(ndx)
 
@@ -241,6 +249,8 @@ def correct_errors(fingerprints, profiles, log_level):
     # this profile will be the reference profile used when repairing the rejected profiles
     conforming_profiles.sort()
     shortest_duration = profiles[conforming_profiles[0]]['end_frame'] - profiles[conforming_profiles[0]]['start_frame']
+    if log_level > 0:
+        print_debug('shortest duration %s from %s' % (shortest_duration, profiles[conforming_profiles[0]]['path']))
     ref_profile_ndx = conforming_profiles[int(floor(len(conforming_profiles) / 2))]
 
     save_season_fingerprint(fingerprints, profiles, ref_profile_ndx, filtered_lengths, log_level)
@@ -255,7 +265,7 @@ def correct_errors(fingerprints, profiles, log_level):
         if log_level > 0:
             print_debug('reprocessing %s by comparing to %s' % (profiles[nprofile]['path'], profiles[ref_profile_ndx]['path']))
         process_pairs(fingerprints, profiles, ref_profile_ndx, nprofile, SECOND, log_level)
-    
+
     # repeat building a list of lengths and filtering them
     lengths = []
     for profile in profiles:
@@ -271,12 +281,12 @@ def correct_errors(fingerprints, profiles, log_level):
             guessed_start = 0
         guessed_start_diff = abs(profiles[nprofile]['end_frame'] - guessed_start - average)
         #print(shortest_duration, guessed_start, guessed_start_diff)
-        if profiles[nprofile]['end_frame'] - profiles[nprofile]['start_frame'] in new_filtered_lengths or \
+        if profiles[nprofile]['end_frame'] - profiles[nprofile]['start_frame'] in new_filtered_lengths and \
                 diff_from_avg < int(15 * profiles[nprofile]['fps']):
 
             if nprofile in non_conforming_profiles:
                 repaired += 1
-                with open('rejects.txt', "a") as logger:
+                with open(os.path.join(data_path, 'rejects.txt'), "a") as logger:
                     logger.write('rejected file successfully reprocessed [%s] start %s end %s\n' % (profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame']))
                 if log_level > 0:
                     print_debug('\nreprocess successful for file [%s] new start %s end %s' % (profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame']))
@@ -284,8 +294,8 @@ def correct_errors(fingerprints, profiles, log_level):
         elif guessed_start_diff < int(15 * profiles[nprofile]['fps']):
             if nprofile in non_conforming_profiles:
                 repaired += 1
-                profiles[nprofile]['start_frame'] = profiles[nprofile]['end_frame'] - shortest_duration
-                with open('rejects.txt', "a") as logger:
+                profiles[nprofile]['start_frame'] = guessed_start
+                with open(os.path.join(data_path, 'rejects.txt'), "a") as logger:
                     logger.write('reprocess successful by guessing start for file [%s] - start %s end %s\n' % (profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame']))
                 if log_level > 0:
                     print_debug('\nreprocess successful by guessing start for file [%s] - new start %s end %s' % (profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame']))
@@ -296,18 +306,15 @@ def correct_errors(fingerprints, profiles, log_level):
                     print_debug('\nfailed to locate intro by reprocessing %s' % profiles[nprofile]['path'])
                     print_debug('file [%s] new start %s end %s' % (profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame']))
                     print_timestamp(profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'])
-                with open('rejects.txt', "a") as logger:
+                with open(os.path.join(data_path, 'rejects.txt'), "a") as logger:
                     logger.write('rejected file failed to be reprocessed [%s] start %s end %s\n' % (profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame']))
                 profiles[nprofile]['start_frame'] = 0
                 profiles[nprofile]['end_frame'] = 0
-            else:
-                if log_level > 0:
-                    print_debug('\warning - previously compliant profile %s would have been rejected by new filter' % profiles[nprofile]['path'])
     if log_level > 0:
         print_debug('\nrepaired %s/%s non conforming profiles\n' % (repaired, len(non_conforming_profiles)))
 
     if len(non_conforming_profiles) > 0:
-        with open('rejects.txt', "a") as logger:
+        with open(os.path.join(data_path, 'rejects.txt'), "a") as logger:
             logger.write('\n')
 
 def process_pairs(fingerprints, profiles, ndx_1, ndx_2, mode, log_level):
@@ -319,12 +326,17 @@ def process_pairs(fingerprints, profiles, ndx_1, ndx_2, mode, log_level):
             if profiles[ndx_1]['start_frame'] < 0:
                 profiles[ndx_1]['start_frame'] = 0
             profiles[ndx_1]['end_frame'] = start_end[0][1]
+            if profiles[ndx_1]['end_frame'] < 0:
+                profiles[ndx_1]['end_frame'] = 0
 
         if mode == BOTH or mode == SECOND:
             profiles[ndx_2]['start_frame'] = start_end[1][0] - check_frame + 1
             if profiles[ndx_2]['start_frame'] < 0:
                 profiles[ndx_2]['start_frame'] = 0
             profiles[ndx_2]['end_frame'] = start_end[1][1]
+            if profiles[ndx_2]['end_frame'] < 0:
+                profiles[ndx_2]['end_frame'] = 0
+
     except:
         if log_level > 0:
             print_debug("could not compare fingerprints from files " + profiles[ndx_1]['path'] + " " + profiles[ndx_2]['path'])
@@ -350,9 +362,9 @@ def process_directory(file_paths = [], log_level=0, cleanup=True):
     if log_level > 0:
         print_debug('processing %s files' % len(file_paths))
     
-    if cleanup and os.path.isdir('fingerprints'):
+    if cleanup and os.path.isdir(os.path.join(data_path, 'fingerprints')):
         try:
-            shutil.rmtree('fingerprints')
+            shutil.rmtree(os.path.join(data_path, 'fingerprints'))
         except OSError as e:
             print_debug("Error: %s : %s" % ('fingerprints', e.strerror))
 
@@ -413,9 +425,9 @@ def process_directory(file_paths = [], log_level=0, cleanup=True):
         print_debug("ended at", end)
         print_debug("duration: " + str(end - start))
 
-    if cleanup and os.path.isdir('fingerprints'):
+    if cleanup and os.path.isdir(os.path.join(data_path, 'fingerprints')):
         try:
-            shutil.rmtree('fingerprints')
+            shutil.rmtree(os.path.join(data_path, 'fingerprints'))
         except OSError as e:
             print_debug("Error: %s : %s" % ('fingerprints', e.strerror))
     return profiles

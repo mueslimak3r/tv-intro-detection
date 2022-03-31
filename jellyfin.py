@@ -18,8 +18,13 @@ server_url = os.environ['JELLYFIN_URL'] if 'JELLYFIN_URL' in os.environ else ''
 server_username = os.environ['JELLYFIN_USERNAME'] if 'JELLYFIN_USERNAME' in os.environ else ''
 server_password = os.environ['JELLYFIN_PASSWORD'] if 'JELLYFIN_PASSWORD' in os.environ else ''
 
+config_path = os.environ['CONFIG_DIR'] if 'CONFIG_DIR' in os.environ else './config'
+data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else os.path.join(config_path, 'data')
+
 minimum_episode_duration = 15 # minutes
 maximum_episodes_per_season = 30 # meant to skip daily shows like jeopardy
+
+sleep_after_finish_sec = 300 # sleep for 5 minutes after the script finishes. If it runs automatically this prevents it rapidly looping
 
 should_stop = False
 
@@ -33,7 +38,10 @@ def replace(s):
 
 def get_path_map():
     path_map = []
-    with open('path_map.txt', 'r') as file:
+    if not os.path.exists(os.path.join(config_path, 'path_map.txt')):
+        return []
+
+    with open(os.path.join(config_path, 'path_map.txt'), 'r') as file:
         for line in file:
             if line.startswith('#'):
                 continue
@@ -75,7 +83,7 @@ def copy_season_fingerprint(result = [], dir_path = "", debug = False):
     hash_object = hashlib.md5(name.encode())
     name = hash_object.hexdigest()
 
-    src_path = "fingerprints/" + name + ".json"
+    src_path = os.path.join(data_path, "fingerprints/" + name + ".json")
     dst_path = os.path.join(dir_path, 'season' + '.json')
     Path(dir_path).mkdir(parents=True, exist_ok=True)
     if os.path.exists(src_path):
@@ -86,7 +94,7 @@ def copy_season_fingerprint(result = [], dir_path = "", debug = False):
 def save_season(season = None, result = None, save_json = False, debug = False):
     if not result or result == None or season == None:
         return
-    path = "jellyfin_cache/" + str(season['SeriesId']) + "/" + str(season['SeasonId'])
+    path = os.path.join(data_path, "jellyfin_cache/" + str(season['SeriesId']) + "/" + str(season['SeasonId']))
     if save_json:
         copy_season_fingerprint(result, path, debug)
 
@@ -108,7 +116,7 @@ def save_season(season = None, result = None, save_json = False, debug = False):
             print_debug('index mismatch')
 
 def check_json_cache(season = None):
-    path = "jellyfin_cache/" + str(season['SeriesId']) + "/" + str(season['SeasonId'])
+    path = os.path.join(data_path, "jellyfin_cache/" + str(season['SeriesId']) + "/" + str(season['SeasonId']))
 
     file_paths = []
 
@@ -131,6 +139,12 @@ def process_jellyfin_shows(log_level = 0, save_json=False):
 
     if should_stop:
         return
+    
+    if os.path.isdir(os.path.join(data_path, 'fingerprints')):
+        try:
+            shutil.rmtree(os.path.join(data_path, 'fingerprints'))
+        except OSError as e:
+            print_debug("Error: %s : %s" % ('deleting fingerprints directory', e.strerror))
 
     show_ndx = 1
     for show in shows:
@@ -161,9 +175,9 @@ def process_jellyfin_shows(log_level = 0, save_json=False):
                     save_season(season, result, save_json, log_level > 0)
                 else:
                     print_debug('no results - the decoder may not have access to the specified media files')
-            if os.path.isdir('fingerprints'):
+            if os.path.isdir(os.path.join(data_path, 'fingerprints')):
                 try:
-                    shutil.rmtree('fingerprints')
+                    shutil.rmtree(os.path.join(data_path, 'fingerprints'))
                 except OSError as e:
                     print_debug("Error: %s : %s" % ('deleting fingerprints directory', e.strerror))
             season_end_time = datetime.now()
@@ -179,6 +193,8 @@ def process_jellyfin_shows(log_level = 0, save_json=False):
 
     end = datetime.now()
     print_debug("total runtime: " + str(end - start))
+    if not should_stop and sleep_after_finish_sec > 0:
+        sleep(300)
 
 def main(argv):
     log_level = 0

@@ -13,6 +13,9 @@ server_url = os.environ['JELLYFIN_URL'] if 'JELLYFIN_URL' in os.environ else ''
 server_username = os.environ['JELLYFIN_USERNAME'] if 'JELLYFIN_USERNAME' in os.environ else ''
 server_password = os.environ['JELLYFIN_PASSWORD'] if 'JELLYFIN_PASSWORD' in os.environ else ''
 
+config_path = os.environ['CONFIG_DIR'] if 'CONFIG_DIR' in os.environ else './config'
+data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else os.path.join(config_path, 'data')
+
 TICKS_PER_MS = 10000
 
 preroll_seconds = 3
@@ -68,7 +71,7 @@ def monitor_sessions():
         position_ticks = int(session['PlayState']['PositionTicks'])
         print('current position %s minutes' % (((position_ticks / TICKS_PER_MS) / 1000) / 60))
 
-        file_path = 'jellyfin_cache/' + str(item['SeriesId']) + '/' + str(item['SeasonId']) + '/' + str(item['Id']) + '.json'
+        file_path = os.path.join(data_path, 'jellyfin_cache/' + str(item['SeriesId']) + '/' + str(item['SeasonId']) + '/' + str(item['Id']) + '.json')
         start_time_ticks = 0
         end_time_ticks = 0
         if os.path.exists(file_path):
