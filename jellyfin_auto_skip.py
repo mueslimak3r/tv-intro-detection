@@ -143,7 +143,7 @@ def monitor_loop(monitor_all_users = False):
     jellyfin_logout()
 
 def main(argv):
-    all_users = g_monitor_all_users
+    all_users = mon_all_users
 
     try:
         opts, args = getopt.getopt(argv,"ha")
