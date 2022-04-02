@@ -272,3 +272,8 @@ def receiveSignal(signalNumber, frame):
 if __name__ == "__main__":
     signal.signal(signal.SIGINT, receiveSignal)
     main(sys.argv[1:])
+<<<<<<< refs/remotes/origin/master
+=======
+
+
+>>>>>>> test
