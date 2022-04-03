@@ -6,8 +6,8 @@ on:
       - master
 
 env:
-  IMAGE_NAME_Scanner: jellyfin-intro-scanner
-  IMAGE_NAME_Skipper: jellyfin-intro-skipper
+  IMAGE_NAME_SCANNER: jellyfin-intro-scanner
+  IMAGE_NAME_SKIPPER: jellyfin-intro-skipper
   REGISTRY: ghcr.io
 
 jobs:
@@ -32,14 +32,14 @@ jobs:
         id: meta
         uses: docker/metadata-action@v2
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_Scanner }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_SCANNER }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/$IMAGE_NAME_Scanner:latest
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME_SCANNER }}:latest
           labels: ${{ steps.meta.outputs.labels }}
           file: Dockerfile_Jellyfin-Intro-Scanner
           
@@ -64,13 +64,13 @@ jobs:
         id: meta
         uses: docker/metadata-action@v2
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_Skipper }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_SKIPPER }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v2
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/$IMAGE_NAME_Skipper:latest
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME_SKIPPER }}:latest
           labels: ${{ steps.meta.outputs.labels }}
           file: Dockerfile_Jellyfin-Intro-Skipper
