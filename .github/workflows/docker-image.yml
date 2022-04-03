@@ -13,9 +13,6 @@ env:
 jobs:
   Scanner_Build_and_Push:
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
-      contents: read
     steps:
       - uses: actions/checkout@v2
       - name: Build image
@@ -44,9 +41,6 @@ jobs:
           
   Skipper_Build_and_Push:
     runs-on: ubuntu-latest
-    permissions:
-      packages: write
-      contents: read
     steps:
       - uses: actions/checkout@v2
 
