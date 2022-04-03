@@ -39,7 +39,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: mueslimak3r/jellyfin-intro-scanner:latest
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/$IMAGE_NAME_Scanner:latest
           labels: ${{ steps.meta.outputs.labels }}
           file: Dockerfile_Jellyfin-Intro-Scanner
           
@@ -71,6 +71,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: mueslimak3r/jellyfin-intro-skipper:latest
+          tags: ${{ env.REGISTRY }}/${{ github.repository_owner }}/$IMAGE_NAME_Skipper:latest
           labels: ${{ steps.meta.outputs.labels }}
           file: Dockerfile_Jellyfin-Intro-Skipper
