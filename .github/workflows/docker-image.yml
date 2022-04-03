@@ -39,7 +39,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: mueslimak3r/jellyfin-intro-scanner:latest
           labels: ${{ steps.meta.outputs.labels }}
           file: Dockerfile_Jellyfin-Intro-Scanner
           
@@ -71,6 +71,6 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
+          tags: mueslimak3r/jellyfin-intro-skipper:latest
           labels: ${{ steps.meta.outputs.labels }}
           file: Dockerfile_Jellyfin-Intro-Skipper
