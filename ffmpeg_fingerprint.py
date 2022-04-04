@@ -77,9 +77,16 @@ def get_fingerprint_ffmpeg(path, frame_nb, log_level=1, log_file=False, log_time
     video_fingerprint = ""
     for ndx in range(1, frame_nb + 1):
         filename = os.path.join(data_path, "fingerprints/" + replace(path) + "/frames/frame-%s.jpeg" % str(ndx).rjust(8, "0"))
-        with Image.open(filename) as image:
-            frame_fingerprint = str(imagehash.dhash(image))
-            video_fingerprint += frame_fingerprint
+        if not os.path.exists(filename):
+            print_debug(a=["Error - Possible Corruption - frame file missing: %s for video %s" % (filename, path)], log=log_level > 0, log_file=log_file)
+            break
+        try:
+            with Image.open(filename) as image:
+                frame_fingerprint = str(imagehash.dhash(image))
+                video_fingerprint += frame_fingerprint
+        except BaseException as err:
+            print_debug(a=["Error - Possible Corruption - frame file error: %s : %s" % (filename, err.strerror)], log=log_level > 0, log_file=log_file)
+            break
     try:
         shutil.rmtree(os.path.join(data_path, "fingerprints/" + replace(path) + "/frames"))
     except OSError as e:
