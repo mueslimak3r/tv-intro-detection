@@ -91,30 +91,30 @@ def create_video_fingerprint(profile, log_level, log_file):
     return video_fingerprint
 
 
-def get_equal_frames(print1, print2):
+def get_equal_frames(print1, print2, start1, start2):
     equal_frames = []
+
     for j in range(0, int(len(print1) / 16 / check_frame)):
         if print1[j * 16 * check_frame:j * 16 * check_frame + 16] == print2[
                 j * 16 * check_frame:j * 16 * check_frame + 16]:
-            equal_frames.append(print1[j * 16 * check_frame:j * 16 * check_frame + 16])
+            equal_frames.append(((int(start1 + (j * check_frame)), int(start2 + (j * check_frame))), print1[j * 16 * check_frame:j * 16 * check_frame + 16]))
     return equal_frames
 
 
 def get_start_end(print1, print2):
     highest_equal_frames = []
     for k in range(0, int(len(print1) / 16)):
-        equal_frames = get_equal_frames(print1[-k * 16:], print2)
+        equal_frames = get_equal_frames(print1[-k * 16:], print2, (len(print1) / 16) - k, 0)
         if len(equal_frames) > len(highest_equal_frames):
             highest_equal_frames = equal_frames
-        equal_frames = get_equal_frames(print1, print2[k * 16:])
+        equal_frames = get_equal_frames(print1, print2[k * 16:], 0, k)
         if len(equal_frames) > len(highest_equal_frames):
             highest_equal_frames = equal_frames
-    regex_string = ".*?".join(highest_equal_frames) + "){1,}"
-    regex_string = regex_string[:-21] + '(' + regex_string[-21:]
-    p = re.compile(regex_string)
-    search = re.search(p, "".join(print1))
-    search2 = re.search(p, "".join(print2))
-    return (int(search.start() / 16), int(search.end() / 16)), (int(search2.start() / 16), int(search2.end() / 16))
+
+    if highest_equal_frames:
+        return (highest_equal_frames[0][0][0], highest_equal_frames[-1][0][0]), (highest_equal_frames[0][0][1], highest_equal_frames[-1][0][1])
+    else:
+        return (0, 0), (0, 0)
 
 
 def get_or_create_fingerprint(file, cleanup, log_level, log_file):
@@ -323,28 +323,30 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
 
 
 def process_pairs(fingerprints, profiles, ndx_1, ndx_2, mode, log_level):
-    try:
-        start_end = get_start_end(fingerprints[ndx_1], fingerprints[ndx_2])
-        
-        if mode == BOTH or mode == FIRST:
-            profiles[ndx_1]['start_frame'] = start_end[0][0] - check_frame + 1
-            if profiles[ndx_1]['start_frame'] < 0:
-                profiles[ndx_1]['start_frame'] = 0
-            profiles[ndx_1]['end_frame'] = start_end[0][1]
-            if profiles[ndx_1]['end_frame'] < 0:
-                profiles[ndx_1]['end_frame'] = 0
 
-        if mode == BOTH or mode == SECOND:
-            profiles[ndx_2]['start_frame'] = start_end[1][0] - check_frame + 1
-            if profiles[ndx_2]['start_frame'] < 0:
-                profiles[ndx_2]['start_frame'] = 0
-            profiles[ndx_2]['end_frame'] = start_end[1][1]
-            if profiles[ndx_2]['end_frame'] < 0:
-                profiles[ndx_2]['end_frame'] = 0
+    start_end = get_start_end(fingerprints[ndx_1], fingerprints[ndx_2])
 
-    except BaseException as err:
-        if log_level > 0:
-            print_debug(a=["could not compare fingerprints from files " + profiles[ndx_1]['path'] + " " + profiles[ndx_2]['path']])
+    if mode == BOTH or mode == FIRST:
+        profiles[ndx_1]['start_frame'] = start_end[0][0]
+        if profiles[ndx_1]['start_frame'] < 0:
+            print_debug(a=["start frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_1]['start_frame'], profiles[ndx_1]['path'])], log=log_level > 0)
+            profiles[ndx_1]['start_frame'] = 0
+        profiles[ndx_1]['end_frame'] = start_end[0][1]
+        if profiles[ndx_1]['end_frame'] < 0:
+            print_debug(a=["end frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_1]['end_frame'], profiles[ndx_1]['path'])], log=log_level > 0)
+            profiles[ndx_1]['end_frame'] = 0
+        print_timestamp(profiles[ndx_1]['path'], profiles[ndx_1]['start_frame'], profiles[ndx_1]['end_frame'], profiles[ndx_1]['fps'], log_level, False)
+
+    if mode == BOTH or mode == SECOND:
+        profiles[ndx_2]['start_frame'] = start_end[1][0]
+        if profiles[ndx_2]['start_frame'] < 0:
+            print_debug(a=["start frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_2]['start_frame'], profiles[ndx_2]['path'])], log=log_level > 0)
+            profiles[ndx_2]['start_frame'] = 0
+        profiles[ndx_2]['end_frame'] = start_end[1][1]
+        if profiles[ndx_2]['end_frame'] < 0:
+            print_debug(a=["end frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_2]['end_frame'], profiles[ndx_2]['path'])], log=log_level > 0)
+            profiles[ndx_2]['end_frame'] = 0
+        print_timestamp(profiles[ndx_2]['path'], profiles[ndx_2]['start_frame'], profiles[ndx_2]['end_frame'], profiles[ndx_2]['fps'], log_level, False)
 
 
 def process_directory(file_paths=[], log_level=0, log_file=False, cleanup=True, log_timestamp=None):
