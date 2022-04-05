@@ -77,7 +77,7 @@ def monitor_sessions(monitor_all_users=False):
         position_ticks = int(session['PlayState']['PositionTicks'])
         print('current position %s minutes' % (((position_ticks / TICKS_PER_MS) / 1000) / 60))
 
-        file_path = Path(data_path / 'jellyfin_cache' / str(item['SeriesId']) / str(item['SeasonId']) / str(item['Id']) + '.json')
+        file_path = Path(data_path / 'jellyfin_cache' / str(item['SeriesId']) / str(item['SeasonId']) / (str(item['Id']) + '.json'))
         start_time_ticks = 0
         end_time_ticks = 0
         if file_path.exists():

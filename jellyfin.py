@@ -56,7 +56,7 @@ def get_path_map():
     if env_path_map_str != '':
         env_maps = env_path_map_str.strip().split(',')
         for m in env_maps:
-            map = m.strip().split(':')
+            map = m.strip().split('::')
             if len(map) != 2:
                 continue
             path_map.append((Path(map[0]), Path(map[1])))
@@ -68,7 +68,7 @@ def get_path_map():
         for line in file:
             if line.startswith('#'):
                 continue
-            map = line.strip().split(':')
+            map = line.strip().split('::')
             if len(map) != 2:
                 continue
             path_map.append((Path(map[0]), Path(map[1])))
@@ -108,8 +108,8 @@ def copy_season_fingerprint(result: list = [], dir_path: Path = None, debug: boo
     hash_object = hashlib.md5(name.encode())
     name = hash_object.hexdigest()
 
-    src_path = Path(data_path / 'fingerprints' / name + '.json')
-    dst_path = Path(dir_path / 'season' + '.json')
+    src_path = Path(data_path / 'fingerprints' / (name + '.json'))
+    dst_path = Path(dir_path / ('season' + '.json'))
     dir_path.mkdir(parents=True, exist_ok=True)
     if src_path.exists():
         if debug:
@@ -136,7 +136,7 @@ def save_season(season=None, result=None, save_json=False, debug=False, log_file
             season['Episodes'][ndx]['created'] = str(datetime.now())
             if save_json:
                 Path(path).mkdir(parents=True, exist_ok=True)
-                with Path(path / str(season['Episodes'][ndx]['EpisodeId']) + '.json').open('w+') as json_file:
+                with Path(path / (str(season['Episodes'][ndx]['EpisodeId']) + '.json')).open('w+') as json_file:
                     json.dump(season['Episodes'][ndx], json_file, indent=4)
         elif debug:
             print_debug(a=['index mismatch'], log_file=log_file)
@@ -150,7 +150,7 @@ def check_json_cache(season=None, log_file=False):
     if path.exists():
         filtered_episodes = []
         for episode in season['Episodes']:
-            if not Path(path / str(episode['EpisodeId']) + '.json').exists():
+            if not Path(path / (str(episode['EpisodeId']) + '.json')).exists():
                 filtered_episodes.append(episode)
         print_debug(a=['processing %s of %s episodes' % (len(filtered_episodes), len(season['Episodes']))], log_file=log_file)
         season['Episodes'] = filtered_episodes

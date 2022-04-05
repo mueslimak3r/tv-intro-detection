@@ -1,3 +1,3 @@
 # use this file if you run jellyfin in a container
 # example:
-# /host/system/tv/path:/jellyfin/container/tv/path
+# /host/system/tv/path::/jellyfin/container/tv/path

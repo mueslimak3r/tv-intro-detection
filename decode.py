@@ -171,7 +171,7 @@ def save_season_fingerprint(fingerprints, profiles, ndx, filtered_lengths, short
     season_fingerprint['average_frames'] = average
     season_fingerprint['average_sample_size'] = len(filtered_lengths)
 
-    path = Path(data_path / 'fingerprints' / name + '.json')
+    path = Path(data_path / 'fingerprints' / (name + '.json'))
     Path(data_path / 'fingerprints').mkdir(parents=True, exist_ok=True)
     with path.open('w+') as json_file:
         json.dump(season_fingerprint, json_file, indent=4)

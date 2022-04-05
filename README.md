@@ -3,6 +3,10 @@
 This project tries to detect intros of tv series by comparing two episodes of the same series and trying to find the
 largest common subset of frames with a bit of fuzziness.
 
+## NOTICE
+
+`path_map.txt` now uses `::` to delimit path maps instead of `:`. This allows handling Windows paths
+
 ## Running
 
 1. Install python dependencies from `requirements.txt`
