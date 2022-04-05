@@ -4,7 +4,6 @@ import sys
 import getopt
 import jellyfin_queries
 import json
-import signal
 import shutil
 import hashlib
 
