@@ -1,4 +1,3 @@
-
 '''
 Big thanks to the jellyfin/jellyfin-mpv-shim devs for most of the code in this file!
 Adapted from:
@@ -8,7 +7,6 @@ https://github.com/jellyfin/jellyfin-mpv-shim
 '''
 
 import sys
-import os
 import json
 import uuid as UUID
 import time
