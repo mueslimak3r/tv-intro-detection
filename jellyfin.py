@@ -20,8 +20,8 @@ server_username = os.environ['JELLYFIN_USERNAME'] if 'JELLYFIN_USERNAME' in os.e
 server_password = os.environ['JELLYFIN_PASSWORD'] if 'JELLYFIN_PASSWORD' in os.environ else ''
 env_path_map_str = os.environ['PATH_MAP'] if 'PATH_MAP' in os.environ else ''
 
-config_path = os.environ['CONFIG_DIR'] if 'CONFIG_DIR' in os.environ else './config'
-data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else os.path.join(config_path, 'data')
+config_path = Path(os.environ['CONFIG_DIR']) if 'CONFIG_DIR' in os.environ else Path(Path.cwd() / 'config')
+data_path = Path(os.environ['DATA_DIR']) if 'DATA_DIR' in os.environ else Path(config_path / 'data')
 
 minimum_episode_duration = 15  # minutes
 maximum_episodes_per_season = 30  # meant to skip daily shows like jeopardy
@@ -40,9 +40,9 @@ def print_debug(a=[], log=True, log_file=False):
     if log:
         print(output, file=sys.stderr)
     if log_file:
-        log_path = os.path.join(config_path, 'logs')
-        Path(log_path).mkdir(parents=True, exist_ok=True)
-        with open(os.path.join(log_path, 'log_%s.txt' % session_timestamp), "a") as logger:
+        log_path = config_path / 'logs'
+        log_path.mkdir(parents=True, exist_ok=True)
+        with (log_path / ('log_%s.txt' % session_timestamp)).open('a') as logger:
             logger.write(output + '\n')
 
 
@@ -59,19 +59,19 @@ def get_path_map():
             map = m.strip().split(':')
             if len(map) != 2:
                 continue
-            path_map.append((map[0], map[1]))
+            path_map.append((Path(map[0]), Path(map[1])))
 
-    if not os.path.exists(os.path.join(config_path, 'path_map.txt')):
+    if not (config_path / 'path_map.txt').exists():
         return path_map
 
-    with open(os.path.join(config_path, 'path_map.txt'), 'r') as file:
+    with (config_path / 'path_map.txt').open('r') as file:
         for line in file:
             if line.startswith('#'):
                 continue
             map = line.strip().split(':')
             if len(map) != 2:
                 continue
-            path_map.append((map[0], map[1]))
+            path_map.append((Path(map[0]), Path(map[1])))
     return path_map
 
 
@@ -98,8 +98,8 @@ def get_jellyfin_shows():
     return shows
 
 
-def copy_season_fingerprint(result=[], dir_path="", debug=False, log_file=False):
-    if not result or dir_path == "":
+def copy_season_fingerprint(result: list = [], dir_path: Path = None, debug: bool = False, log_file: bool = False):
+    if not result or dir_path is None:
         return
 
     name = ''
@@ -108,10 +108,10 @@ def copy_season_fingerprint(result=[], dir_path="", debug=False, log_file=False)
     hash_object = hashlib.md5(name.encode())
     name = hash_object.hexdigest()
 
-    src_path = os.path.join(data_path, "fingerprints/" + name + ".json")
-    dst_path = os.path.join(dir_path, 'season' + '.json')
-    Path(dir_path).mkdir(parents=True, exist_ok=True)
-    if os.path.exists(src_path):
+    src_path = Path(data_path / 'fingerprints' / name + '.json')
+    dst_path = Path(dir_path / 'season' + '.json')
+    dir_path.mkdir(parents=True, exist_ok=True)
+    if src_path.exists():
         if debug:
             print_debug(a=['saving season fingerprint to jellyfin_cache'], log_file=log_file)
         shutil.copyfile(src_path, dst_path)
@@ -120,7 +120,7 @@ def copy_season_fingerprint(result=[], dir_path="", debug=False, log_file=False)
 def save_season(season=None, result=None, save_json=False, debug=False, log_file=False):
     if not result or season is None:
         return
-    path = os.path.join(data_path, "jellyfin_cache/" + str(season['SeriesId']) + "/" + str(season['SeasonId']))
+    path = data_path / 'jellyfin_cache' / str(season['SeriesId']) / str(season['SeasonId'])
     if save_json:
         copy_season_fingerprint(result, path, debug, log_file)
 
@@ -136,21 +136,21 @@ def save_season(season=None, result=None, save_json=False, debug=False, log_file
             season['Episodes'][ndx]['created'] = str(datetime.now())
             if save_json:
                 Path(path).mkdir(parents=True, exist_ok=True)
-                with open(os.path.join(path, str(season['Episodes'][ndx]['EpisodeId']) + '.json'), "w+") as json_file:
+                with Path(path / str(season['Episodes'][ndx]['EpisodeId']) + '.json').open('w+') as json_file:
                     json.dump(season['Episodes'][ndx], json_file, indent=4)
         elif debug:
             print_debug(a=['index mismatch'], log_file=log_file)
 
 
 def check_json_cache(season=None, log_file=False):
-    path = os.path.join(data_path, "jellyfin_cache/" + str(season['SeriesId']) + "/" + str(season['SeasonId']))
+    path = data_path / 'jellyfin_cache' / str(season['SeriesId']) / str(season['SeasonId'])
 
     file_paths = []
 
-    if os.path.exists(path):
+    if path.exists():
         filtered_episodes = []
         for episode in season['Episodes']:
-            if not os.path.exists(os.path.join(path, str(episode['EpisodeId']) + '.json')):
+            if not Path(path / str(episode['EpisodeId']) + '.json').exists():
                 filtered_episodes.append(episode)
         print_debug(a=['processing %s of %s episodes' % (len(filtered_episodes), len(season['Episodes']))], log_file=log_file)
         season['Episodes'] = filtered_episodes
@@ -169,9 +169,9 @@ def process_jellyfin_shows(log_level=0, log_file=False, save_json=False):
     if should_stop:
         return
     
-    if os.path.isdir(os.path.join(data_path, 'fingerprints')):
+    if (data_path / 'fingerprints').is_dir():
         try:
-            shutil.rmtree(os.path.join(data_path, 'fingerprints'))
+            shutil.rmtree(data_path / 'fingerprints')
         except OSError as e:
             print_debug(a=["Error: %s : %s" % ('deleting fingerprints directory', e.strerror)], log_file=log_file)
 
@@ -204,9 +204,9 @@ def process_jellyfin_shows(log_level=0, log_file=False, save_json=False):
                     save_season(season, result, save_json, log_level > 0, log_file)
                 else:
                     print_debug(a=['no results - the decoder may not have access to the specified media files'], log_file=log_file)
-            if os.path.isdir(os.path.join(data_path, 'fingerprints')):
+            if (data_path / 'fingerprints').is_dir():
                 try:
-                    shutil.rmtree(os.path.join(data_path, 'fingerprints'))
+                    shutil.rmtree(data_path / 'fingerprints')
                 except OSError as e:
                     print_debug(a=["Error: %s : %s" % ('deleting fingerprints directory', e.strerror)], log_file=log_file)
             season_end_time = datetime.now()

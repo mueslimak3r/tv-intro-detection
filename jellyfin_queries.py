@@ -1,15 +1,19 @@
-import os
 from time import sleep
+from pathlib import Path
 
 
 def map_path(path, path_map):
     new_path = path
 
     for mapping in path_map:
-        if mapping[1] in path:
-            remainder = path[len(mapping[1]) + 1:] if str(path[len(mapping[1]):]).startswith('/') else path[len(mapping[1]):]
-            new_path = os.path.join(mapping[0], remainder)
-            break
+        path_map_parts_list = list(Path(mapping[1]).parts)
+        jellyfin_path_parts_list = list(Path(path).parts)
+
+        path_map_parts = set(map(str.lower, Path(mapping[1]).parts))
+        jellyfin_path_parts = set(map(str.lower, Path(path).parts))
+
+        if path_map_parts.issubset(jellyfin_path_parts):
+            new_path = str(Path(mapping[0]).joinpath(Path(*jellyfin_path_parts_list[len(path_map_parts_list):])))
     return new_path
 
 

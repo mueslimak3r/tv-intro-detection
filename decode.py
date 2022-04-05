@@ -18,8 +18,8 @@ FIRST = 0
 SECOND = 1
 BOTH = 2
 
-config_path = os.environ['CONFIG_DIR'] if 'CONFIG_DIR' in os.environ else './config'
-data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else os.path.join(config_path, 'data')
+config_path = Path(os.environ['CONFIG_DIR']) if 'CONFIG_DIR' in os.environ else Path(Path.cwd() / 'config')
+data_path = Path(os.environ['DATA_DIR']) if 'DATA_DIR' in os.environ else Path(config_path / 'data')
 
 preroll_seconds = 0     # adjust the end time to return n seconds prior to the calculated end time
                         # jellyfin_auto_skip.py also handles pre-roll so adjust it there
@@ -41,9 +41,9 @@ def print_debug(a=[], log=True, log_file=False):
     if log:
         print(output, file=sys.stderr)
     if log_file:
-        log_path = os.path.join(config_path, 'logs')
-        Path(log_path).mkdir(parents=True, exist_ok=True)
-        with open(os.path.join(log_path, 'log_%s.txt' % session_timestamp), "a") as logger:
+        log_path = config_path / 'logs'
+        log_path.mkdir(parents=True, exist_ok=True)
+        with (log_path / ('log_%s.txt' % session_timestamp)).open('a') as logger:
             logger.write(output + '\n')
 
 
@@ -54,8 +54,8 @@ def dict_by_value(dict, value):
 
 
 def write_fingerprint(path, fingerprint):
-    path = os.path.join(data_path, "fingerprints/" + replace(path) + "/fingerprint.txt")
-    with open(path, "w+") as text_file:
+    path = Path(data_path / 'fingerprints' / replace(path) / 'fingerprint.txt')
+    with path.open('w+') as text_file:
         text_file.write(fingerprint)
 
 
@@ -86,8 +86,6 @@ def create_video_fingerprint(profile, log_level, log_file):
     quarter_frames_or_first_X_mins = min(int(profile['total_frames'] / 4), int(profile['fps'] * 60 * max_fingerprint_mins))
     video_fingerprint = get_fingerprint_ffmpeg(profile['path'], quarter_frames_or_first_X_mins, log_level, log_file, session_timestamp)
 
-    if video_fingerprint == '':
-        raise Exception("error creating fingerprint for video [%s]" % profile['path'])
     return video_fingerprint
 
 
@@ -128,9 +126,9 @@ def get_or_create_fingerprint(file, cleanup, log_level, log_file):
     profile['total_frames'] = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
     video.release()
 
-    if os.path.exists(os.path.join(data_path, "fingerprints/" + replace(file) + "/fingerprint.txt")):
+    if Path(data_path / 'fingerprints' / replace(file) / 'fingerprint.txt').exists():
         print_debug(a=['loading existing fingerprint for [%s]' % file], log=log_level > 0, log_file=log_file)
-        with open(os.path.join(data_path, "fingerprints/" + replace(file) + "/fingerprint.txt"), "r") as text_file:
+        with Path(data_path / 'fingerprints' / replace(file) / 'fingerprint.txt').open('r') as text_file:
             fingerprint = text_file.read()
     else:
         print_debug(a=['creating new fingerprint for [%s]' % file], log=log_level > 0, log_file=log_file)
@@ -148,7 +146,7 @@ def check_files_exist(file_paths=[]):
     if not file_paths:
         return False
     for file in file_paths:
-        if not os.path.exists(file):
+        if not Path(file).exists:
             return False
     return True
 
@@ -173,26 +171,10 @@ def save_season_fingerprint(fingerprints, profiles, ndx, filtered_lengths, short
     season_fingerprint['average_frames'] = average
     season_fingerprint['average_sample_size'] = len(filtered_lengths)
 
-    path = os.path.join(data_path, "fingerprints/" + name + ".json")
-    Path(os.path.join(data_path, "fingerprints")).mkdir(parents=True, exist_ok=True)
-    with open(path, "w+") as json_file:
+    path = Path(data_path / 'fingerprints' / name + '.json')
+    Path(data_path / 'fingerprints').mkdir(parents=True, exist_ok=True)
+    with path.open('w+') as json_file:
         json.dump(season_fingerprint, json_file, indent=4)
-
-
-'''
-def reject_outliers(data, m = 1.):
-    if not isinstance(data, numpy.ndarray):
-        data = numpy.array(data)
-    d = numpy.abs(data - numpy.median(data))
-    mdev = numpy.median(d)
-    s = d / (mdev if mdev else 0.)
-    output = data[s<m].tolist()
-
-    # sometimes numpy tolist() returns a nested list
-    if type(output[0]) == list:
-        return output[0]
-    return output
-'''
 
 
 def reject_outliers(input_list, iq_range=0.2):
@@ -371,9 +353,9 @@ def process_directory(file_paths=[], log_level=0, log_file=False, cleanup=True, 
     
     print_debug(a=['processing %s files' % len(file_paths)], log=log_level > 0, log_file=log_file)
     
-    if cleanup and os.path.isdir(os.path.join(data_path, 'fingerprints')):
+    if cleanup and Path(data_path / 'fingerprints').is_dir():
         try:
-            shutil.rmtree(os.path.join(data_path, 'fingerprints'))
+            shutil.rmtree(Path(data_path / 'fingerprints'))
         except OSError as e:
             print_debug(a=["Error: %s : %s" % ('fingerprints', e.strerror)], log_file=log_file)
 
@@ -425,11 +407,11 @@ def process_directory(file_paths=[], log_level=0, log_file=False, cleanup=True, 
     print_debug(a=["ended at", end], log=log_level > 0, log_file=True)
     print_debug(a=["run time: " + str(end - start)], log=log_level > 0, log_file=True)
 
-    if cleanup and os.path.isdir(os.path.join(data_path, 'fingerprints')):
+    if cleanup and Path(data_path / 'fingerprints').is_dir():
         try:
-            shutil.rmtree(os.path.join(data_path, 'fingerprints'))
+            shutil.rmtree(Path(data_path / 'fingerprints'))
         except OSError as e:
-            print_debug(a=["Error: %s : %s" % ('fingerprints', e.strerror)], log_file=True)
+            print_debug(a=["Error: %s : %s" % ('fingerprints', e.strerror)], log_file=log_file)
     return profiles
 
 
@@ -460,27 +442,23 @@ def main(argv):
         elif opt == '-c':
             cleanup = True
 
-    if path == '' or not os.path.isdir(path):
+    if path == '' or not Path(path).is_dir():
         print_debug(['decode.py -i <path> -v (verbose - some logging) -d (debug - most logging) -c (cleanup) -s (slow mode) -l (log to file)\n'])
         sys.exit(2)
 
     common_video_extensions = ['.webm', '.mkv', '.avi', '.mts', '.m2ts', '.ts', '.mov', '.wmv', '.mp4', '.m4v', '.mpg', '.mpeg', '.m2v']
 
     file_paths = []
-    if os.path.isdir(path):
-        child_dirs = os.listdir(path)
-        for child in child_dirs:
-            if child[0] == '.':
-                continue
-            matched_ext = False
-            for ext in common_video_extensions:
-                if child.endswith(ext):
-                    matched_ext = True
-            if matched_ext:
-                file_paths.append(os.path.join(path, child))
-        file_paths.sort()
-    else:
-        print_debug(['input directory invalid or cannot be accessed'])
+    for child in Path(path).iterdir():
+        if child.name[0] == '.':
+            continue
+        matched_ext = False
+        for ext in common_video_extensions:
+            if child.name.endswith(ext):
+                matched_ext = True
+        if matched_ext:
+            file_paths.append(str(child.resolve()))
+    file_paths.sort()
 
     result = process_directory(file_paths=file_paths, log_level=log_level, log_file=log, cleanup=cleanup)
     print(result)

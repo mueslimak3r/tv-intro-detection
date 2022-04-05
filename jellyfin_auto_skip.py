@@ -5,6 +5,7 @@ import signal
 import sys
 import getopt
 
+from pathlib import Path
 from time import sleep
 from datetime import datetime, timezone
 from requests.exceptions import HTTPError
@@ -17,8 +18,8 @@ server_password = os.environ['JELLYFIN_PASSWORD'] if 'JELLYFIN_PASSWORD' in os.e
 
 mon_all_users = os.environ['MONITOR_ALL_USERS'] if 'MONITOR_ALL_USERS' in os.environ else ''
 
-config_path = os.environ['CONFIG_DIR'] if 'CONFIG_DIR' in os.environ else './config'
-data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else os.path.join(config_path, 'data')
+config_path = Path(os.environ['CONFIG_DIR']) if 'CONFIG_DIR' in os.environ else Path(Path.cwd() / 'config')
+data_path = Path(os.environ['DATA_DIR']) if 'DATA_DIR' in os.environ else Path(config_path / 'data')
 
 TICKS_PER_MS = 10000
 
@@ -76,11 +77,11 @@ def monitor_sessions(monitor_all_users=False):
         position_ticks = int(session['PlayState']['PositionTicks'])
         print('current position %s minutes' % (((position_ticks / TICKS_PER_MS) / 1000) / 60))
 
-        file_path = os.path.join(data_path, 'jellyfin_cache/' + str(item['SeriesId']) + '/' + str(item['SeasonId']) + '/' + str(item['Id']) + '.json')
+        file_path = Path(data_path / 'jellyfin_cache' / str(item['SeriesId']) / str(item['SeasonId']) / str(item['Id']) + '.json')
         start_time_ticks = 0
         end_time_ticks = 0
-        if os.path.exists(file_path):
-            with open(file_path, "r") as json_file:
+        if file_path.exists():
+            with file_path.open('r') as json_file:
                 dict = json.load(json_file)
                 if 'start_time_ms' in dict and 'end_time_ms' in dict:
                     start_time_ticks = int(dict['start_time_ms']) * TICKS_PER_MS
