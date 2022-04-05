@@ -28,8 +28,6 @@ maximum_episodes_per_season = 30  # meant to skip daily shows like jeopardy
 
 sleep_after_finish_sec = 300  # sleep for 5 minutes after the script finishes. If it runs automatically this prevents it rapidly looping
 
-should_stop = False
-
 session_timestamp = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
 
 
@@ -85,12 +83,8 @@ def get_jellyfin_shows():
     client = jellyfin_login(server_url, server_username, server_password)
     shows = jellyfin_queries.get_shows(client, path_map)
     for show in shows:
-        if should_stop:
-            break
         seasons = jellyfin_queries.get_seasons(client, path_map, show)
         for season in seasons:
-            if should_stop:
-                break
             season['Episodes'] = jellyfin_queries.get_episodes(client, path_map, season)
         show['Seasons'] = seasons
     jellyfin_logout()
@@ -165,9 +159,6 @@ def process_jellyfin_shows(log_level=0, log_file=False, save_json=False):
     print_debug(a=["\n\nstarted new session at %s\n" % start], log_file=log_file)
 
     shows = get_jellyfin_shows()
-
-    if should_stop:
-        return
     
     if (data_path / 'fingerprints').is_dir():
         try:
@@ -213,16 +204,12 @@ def process_jellyfin_shows(log_level=0, log_file=False, save_json=False):
             print_debug(a=['processed season [%s] in %s' % (season['Name'], str(season_end_time - season_start_time))], log_file=log_file)
             if file_paths:
                 sleep(2)
-            if should_stop:
-                break
         show_end_time = datetime.now()
         print_debug(a=['processed show [%s] in %s' % (show['Name'], str(show_end_time - show_start_time))], log_file=log_file)
-        if should_stop:
-            break
 
     end = datetime.now()
     print_debug(a=["total runtime: " + str(end - start)], log_file=log_file)
-    if not should_stop and sleep_after_finish_sec > 0:
+    if sleep_after_finish_sec > 0:
         print_debug(a=['sleeping for %s seconds' % sleep_after_finish_sec])
         sleep(300)
 
@@ -260,15 +247,5 @@ def main(argv):
     process_jellyfin_shows(log_level, log, save_json)
 
 
-def receiveSignal(signalNumber, frame):
-    global should_stop
-    print_debug(['Received signal:', signalNumber])
-    if signalNumber == signal.SIGINT:
-        print_debug(['will stop'])
-        should_stop = True
-    return
-
-
 if __name__ == "__main__":
-    signal.signal(signal.SIGINT, receiveSignal)
     main(sys.argv[1:])
