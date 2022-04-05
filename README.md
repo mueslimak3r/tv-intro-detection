@@ -5,12 +5,12 @@ largest common subset of frames with a bit of fuzziness.
 
 ## NOTICE
 
-`path_map.txt` now uses `::` to delimit path maps instead of `:`. This allows handling Windows paths
+`path_map.txt` and env `PATH_MAP` now uses `::` to delimit path maps instead of `:`. This allows handling Windows paths
 
 ## Running
 
 1. Install python dependencies from `requirements.txt`
-2. Install ffmpeg (optional)
+2. Install ffmpeg
 3. To use with Jellyfin, run `jellyfin.py`. This will query Jellyfin for a list of series and their paths.
 4. To process a directory manually, run `decode.py` and pass the parameter `-i` with the path to a directory containing at least **two** episodes of the same season
 
