@@ -39,9 +39,9 @@ def get_frames(path, frame_nb, log_level, log_file):
         return False
     print_debug(a=['running ffmpeg'], log=log_level > 0, log_file=log_file)
     start = datetime.now()
-    filename = Path(data_path / 'fingerprints' / replace(path) / '/frames/frame-%08d.jpeg')
+    filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / 'frame-%08d.jpeg')
     with Path(os.devnull).open('w') as fp:
-        process = subprocess.Popen(args=["ffmpeg", "-i", path, "-frames:v", str(frame_nb), "-s", "384x216", filename.absolute()], stdout=fp, stderr=fp)
+        process = subprocess.Popen(args=["ffmpeg", "-i", path, "-frames:v", str(frame_nb), "-s", "384x216", str(filename)], stdout=fp, stderr=fp)
         process.wait()
         end = datetime.now()
         print_debug(a=["ran ffmpeg in %s" % str(end - start)], log=log_level > 0, log_file=log_file)
