@@ -56,7 +56,7 @@ def check_frames_already_exist(path, frame_nb):
     return True
 
 
-def get_fingerprint_ffmpeg(path, frame_nb, log_level=1, log_file=False, log_timestamp=None):
+def get_fingerprint_ffmpeg(path, frame_nb, log_level=1, log_file=False, log_timestamp=None, cleanup=False):
     global session_timestamp
 
     if path is None or path == '' or frame_nb == 0:
@@ -87,10 +87,11 @@ def get_fingerprint_ffmpeg(path, frame_nb, log_level=1, log_file=False, log_time
         except BaseException as err:
             print_debug(a=["Error - Possible Corruption - frame file error: %s : %s" % (filename, err.strerror)], log=log_level > 0, log_file=log_file)
             break
-    try:
-        shutil.rmtree(Path(data_path / 'fingerprints' / replace(path) / 'frames'))
-    except OSError as e:
-        print_debug(a=["Error: %s : %s" % (Path(data_path / 'fingerprints' / replace(path) / 'frames'), e.strerror)], log=log_level > 0, log_file=log_file)
+    if cleanup:
+        try:
+            shutil.rmtree(Path(data_path / 'fingerprints' / replace(path) / 'frames'))
+        except OSError as e:
+            print_debug(a=["Error: %s : %s" % (Path(data_path / 'fingerprints' / replace(path) / 'frames'), e.strerror)], log=log_level > 0, log_file=log_file)
     end = datetime.now()
     print_debug(a=["made hash in %s" % str(end - start)], log=log_level > 0, log_file=log_file)
     return video_fingerprint
@@ -146,7 +147,7 @@ def main(argv):
                 fps = video.get(cv2.CAP_PROP_FPS)
                 quarter_frames_or_first_X_mins = min(int(frames / 4), int(fps * 60 * max_fingerprint_mins))
                 video.release()
-                result = get_fingerprint_ffmpeg(path, quarter_frames_or_first_X_mins)
+                result = get_fingerprint_ffmpeg(path, quarter_frames_or_first_X_mins, log_level, True, None, cleanup)
         end = datetime.now()
         print_debug(["total runtime %s" % str(end - start)])
     else:

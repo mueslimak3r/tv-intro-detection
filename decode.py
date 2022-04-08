@@ -84,7 +84,7 @@ def create_video_fingerprint(profile, log_level, log_file):
     video_fingerprint = ''
 
     quarter_frames_or_first_X_mins = min(int(profile['total_frames'] / 4), int(profile['fps'] * 60 * max_fingerprint_mins))
-    video_fingerprint = get_fingerprint_ffmpeg(profile['path'], quarter_frames_or_first_X_mins, log_level, log_file, session_timestamp)
+    video_fingerprint = get_fingerprint_ffmpeg(profile['path'], quarter_frames_or_first_X_mins, log_level, log_file, session_timestamp, False)
 
     return video_fingerprint
 
@@ -101,8 +101,8 @@ def get_equal_frames(print1, print2, start1, start2):
 
 def get_start_end(print1, print2):
     highest_equal_frames = []
-    for k in range(0, int(len(print1) / 16)):
-        equal_frames = get_equal_frames(print1[-k * 16:], print2, (len(print1) / 16) - k, 0)
+    for k in range(1, int(len(print1) / 16)):
+        equal_frames = get_equal_frames(print1[-k * 16:], print2, int(len(print1) / 16) - k, 0)
         if len(equal_frames) > len(highest_equal_frames):
             highest_equal_frames = equal_frames
         equal_frames = get_equal_frames(print1, print2[k * 16:], 0, k)
