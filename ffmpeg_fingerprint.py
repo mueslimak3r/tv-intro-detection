@@ -11,8 +11,8 @@ from pathlib import Path
 from PIL import Image
 from datetime import datetime
 
-config_path = os.environ['CONFIG_DIR'] if 'CONFIG_DIR' in os.environ else './config'
-data_path = os.environ['DATA_DIR'] if 'DATA_DIR' in os.environ else os.path.join(config_path, 'data')
+config_path = Path(os.environ['CONFIG_DIR']) if 'CONFIG_DIR' in os.environ else Path(Path.cwd() / 'config')
+data_path = Path(os.environ['DATA_DIR']) if 'DATA_DIR' in os.environ else Path(config_path / 'data')
 
 session_timestamp = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
 
@@ -24,9 +24,9 @@ def print_debug(a=[], log=True, log_file=False):
     if log:
         print(output, file=sys.stderr)
     if log_file:
-        log_path = os.path.join(config_path, 'logs')
-        Path(log_path).mkdir(parents=True, exist_ok=True)
-        with open(os.path.join(log_path, 'log_%s.txt' % session_timestamp), "a") as logger:
+        log_path = config_path / 'logs'
+        log_path.mkdir(parents=True, exist_ok=True)
+        with (log_path / ('log_%s.txt' % session_timestamp)).open('a') as logger:
             logger.write(output + '\n')
 
 
@@ -39,9 +39,11 @@ def get_frames(path, frame_nb, log_level, log_file):
         return False
     print_debug(a=['running ffmpeg'], log=log_level > 0, log_file=log_file)
     start = datetime.now()
-    filename = os.path.join(data_path, "fingerprints/" + replace(path) + "/frames/frame-%08d.jpeg")
-    with open(os.devnull, 'w') as fp:
-        process = subprocess.Popen(args=["ffmpeg", "-i", path, "-frames:v", str(frame_nb), "-s", "384x216", filename], stdout=fp, stderr=fp)
+    filename = Path(data_path / 'fingerprints' / replace(path) / '/frames/frame-%08d.jpeg')
+    if not filename.exists():
+        return -1
+    with Path(os.devnull).open('w') as fp:
+        process = subprocess.Popen(args=["ffmpeg", "-i", path, "-frames:v", str(frame_nb), "-s", "384x216", filename.absolute()], stdout=fp, stderr=fp)
         process.wait()
         end = datetime.now()
         print_debug(a=["ran ffmpeg in %s" % str(end - start)], log=log_level > 0, log_file=log_file)
@@ -50,8 +52,8 @@ def get_frames(path, frame_nb, log_level, log_file):
 
 def check_frames_already_exist(path, frame_nb):
     for ndx in range(1, frame_nb + 1):
-        filename = os.path.join(data_path, "fingerprints/" + replace(path) + "/frames/frame-%s.jpeg" % str(ndx).rjust(8, "0"))
-        if not os.path.exists(filename):
+        filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / ('frame-%s.jpeg' % str(ndx).rjust(8, '0')))
+        if not filename.exists():
             return False
     return True
 
@@ -65,7 +67,7 @@ def get_fingerprint_ffmpeg(path, frame_nb, log_level=1, log_file=False, log_time
     if log_timestamp is not None:
         session_timestamp = log_timestamp
 
-    Path(os.path.join(data_path, "fingerprints/" + replace(path) + "/frames")).mkdir(parents=True, exist_ok=True)
+    Path(data_path / 'fingerprints' / replace(path) / 'frames').mkdir(parents=True, exist_ok=True)
     if not check_frames_already_exist(path, frame_nb):
         if not get_frames(path, frame_nb, log_level, log_file):
             print_debug(a=['ffmpeg error'], log=log_level > 0, log_file=log_file)
@@ -76,8 +78,8 @@ def get_fingerprint_ffmpeg(path, frame_nb, log_level=1, log_file=False, log_time
     start = datetime.now()
     video_fingerprint = ""
     for ndx in range(1, frame_nb + 1):
-        filename = os.path.join(data_path, "fingerprints/" + replace(path) + "/frames/frame-%s.jpeg" % str(ndx).rjust(8, "0"))
-        if not os.path.exists(filename):
+        filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / ('frame-%s.jpeg' % str(ndx).rjust(8, '0')))
+        if not filename.exists():
             print_debug(a=["Error - Possible Corruption - frame file missing: %s for video %s" % (filename, path)], log=log_level > 0, log_file=log_file)
             break
         try:
@@ -88,9 +90,9 @@ def get_fingerprint_ffmpeg(path, frame_nb, log_level=1, log_file=False, log_time
             print_debug(a=["Error - Possible Corruption - frame file error: %s : %s" % (filename, err.strerror)], log=log_level > 0, log_file=log_file)
             break
     try:
-        shutil.rmtree(os.path.join(data_path, "fingerprints/" + replace(path) + "/frames"))
+        shutil.rmtree(Path(data_path / 'fingerprints' / replace(path) / 'frames'))
     except OSError as e:
-        print_debug(a=["Error: %s : %s" % (os.path.join(data_path, "fingerprints/" + replace(path) + "/frames"), e.strerror)], log=log_level > 0, log_file=log_file)
+        print_debug(a=["Error: %s : %s" % (Path(data_path / 'fingerprints' / replace(path) / 'frames'), e.strerror)], log=log_level > 0, log_file=log_file)
     end = datetime.now()
     print_debug(a=["made hash in %s" % str(end - start)], log=log_level > 0, log_file=log_file)
     return video_fingerprint
@@ -123,25 +125,24 @@ def main(argv):
         elif opt == '-s':
             slow_mode = True
 
-    if dir == '' or not os.path.isdir(dir):
+    if dir == '' or not Path(dir).is_dir():
         print_debug(['decode.py -i <path> -v (verbose - some logging) -d (debug - most logging) -c (cleanup) -s (slow mode)\n'])
         sys.exit(2)
 
     common_video_extensions = ['.webm', '.mkv', '.avi', '.mts', '.m2ts', '.ts', '.mov', '.wmv', '.mp4', '.m4v', '.mpg', '.mpeg', '.m2v']
 
-    if os.path.isdir(dir):
+    if Path(dir).is_dir():
         start = datetime.now()
-        child_dirs = os.listdir(dir)
-        for child in child_dirs:
-            if child[0] == '.':
+        for child in Path(dir).iterdir():
+            if child.name[0] == '.':
                 continue
             matched_ext = False
             for ext in common_video_extensions:
-                if child.endswith(ext):
+                if child.name.endswith(ext):
                     matched_ext = True
             if matched_ext:
                 max_fingerprint_mins = 10
-                path = os.path.join(dir, child)
+                path = str(child.resolve())
                 video = cv2.VideoCapture(path)
                 frames = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
                 fps = video.get(cv2.CAP_PROP_FPS)

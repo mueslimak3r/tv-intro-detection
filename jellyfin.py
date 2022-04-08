@@ -194,6 +194,8 @@ def process_jellyfin_shows(log_level=0, log_file=False, save_json=False):
                     save_season(season, result, save_json, log_level > 0, log_file)
                 else:
                     print_debug(a=['no results - the decoder may not have access to the specified media files'], log_file=log_file)
+            else:
+                print_debug(a=['all files were excluded - they either can\'t be found or were previously processed'], log_file=log_file)
             if (data_path / 'fingerprints').is_dir():
                 try:
                     shutil.rmtree(data_path / 'fingerprints')

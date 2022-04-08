@@ -146,7 +146,7 @@ def check_files_exist(file_paths=[]):
     if not file_paths:
         return False
     for file in file_paths:
-        if not Path(file).exists:
+        if not Path(file).exists():
             return False
     return True
 
