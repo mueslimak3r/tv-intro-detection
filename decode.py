@@ -367,6 +367,15 @@ def process_directory(file_paths=[], log_level=0, log_file=False, cleanup=True, 
         fingerprints.append(fingerprint)
         profiles.append(profile)
 
+    valid_fingerprints = 0
+    for fingerp in fingerprints:
+        if fingerp != '':
+            valid_fingerprints += 1
+
+    if valid_fingerprints < 2:
+        print_debug(a=['fewer than 2 valid fingerprints were found - skipping'], log=log_level > 0, log_file=log_file)
+        return {}
+
     counter = 0
 
     # loop through each pair and store the start/end frames in their profiles
