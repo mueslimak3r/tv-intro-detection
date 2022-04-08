@@ -259,6 +259,16 @@ def save_season(season=None, result=None, save_json=False, debug=False, log_file
         elif debug:
             print_debug(a=['index mismatch'], log_file=log_file)
 
+def get_season_fingerprint(season=None, debug=False, log_file=False):
+    if season is None:
+        return
+    
+    season_fingerprint = None
+    path = Path(data_path / 'jellyfin_cache' / str(season['SeriesId']) / str(season['SeasonId']) / ('season' + '.json'))
+    if path.exists():
+        with path.open('r') as json_file:
+            season_fingerprint = json.load(json_file)
+    return season_fingerprint
 
 def process_jellyfin_shows(log_level=0, log_file=False, save_json=False, reverse_sort=False):
     start = datetime.now()
@@ -292,7 +302,7 @@ def process_jellyfin_shows(log_level=0, log_file=False, save_json=False, reverse
 
             if file_paths:
                 print_debug(a=['%s/%s - %s - %s episodes' % (season_ndx, len(show['Seasons']), season['Name'], len(season['Episodes']))], log_file=log_file)
-                result = process_directory(file_paths=file_paths, cleanup=False, log_level=2 if log_level > 0 else 0, log_file=log_file, log_timestamp=session_timestamp)
+                result = process_directory(file_paths=file_paths, ref_profile=get_season_fingerprint(season=season, debug=log_level > 0, log_file=log_file), cleanup=False, log_level=2 if log_level > 0 else 0, log_file=log_file, log_timestamp=session_timestamp)
                 if result:
                     save_season(season, result, save_json, log_level > 0, log_file)
                     total_processed += len(result)

@@ -338,7 +338,7 @@ def process_pairs(fingerprints, profiles, ndx_1, ndx_2, mode, log_level):
         print_timestamp(profiles[ndx_2]['path'], profiles[ndx_2]['start_frame'], profiles[ndx_2]['end_frame'], profiles[ndx_2]['fps'], log_level, False)
 
 
-def process_directory(file_paths=[], log_level=0, log_file=False, cleanup=True, log_timestamp=None):
+def process_directory(file_paths=[], ref_profile=None, log_level=0, log_file=False, cleanup=True, log_timestamp=None):
     global session_timestamp
 
     if log_timestamp is not None:
@@ -379,11 +379,14 @@ def process_directory(file_paths=[], log_level=0, log_file=False, cleanup=True, 
         if fingerp != '':
             valid_fingerprints += 1
 
-    if valid_fingerprints < 2:
+    if (ref_profile is not None and valid_fingerprints < 1) or (ref_profile is None and valid_fingerprints < 2):
         print_debug(a=['fewer than 2 valid fingerprints were found - skipping'], log=log_level > 0, log_file=log_file)
         return {}
 
-    counter = 0
+    if ref_profile != None:
+        fingerprints.insert(0, ref_profile['fingerprint'])
+        ref_profile.pop('fingerprint', None)
+        profiles.insert(0, ref_profile)
 
     # loop through each pair and store the start/end frames in their profiles
     # then do the same for the remaining profile if count is odd
@@ -392,12 +395,17 @@ def process_directory(file_paths=[], log_level=0, log_file=False, cleanup=True, 
     # changing modes is useful for processing a new profile against one that's already processed
     # for instance, if a profile is rejected it could be reprocessed against a different profile without risking...
     # ...overwriting the the start/end frame values for the reference profile
+    counter = 0
     process_pairs_start = datetime.now()
-    while len(fingerprints) - 1 > counter:
-        process_pairs(fingerprints, profiles, counter, counter + 1, BOTH, log_level)
-        counter += 2
-    if len(fingerprints) % 2 != 0:
-        process_pairs(fingerprints, profiles, -2, -1, SECOND, log_level)
+    if ref_profile != None:
+        for i in range(1, len(fingerprints)):
+            process_pairs(fingerprints, profiles, 0, i, SECOND, log_level)
+    else:
+        while len(fingerprints) - 1 > counter:
+            process_pairs(fingerprints, profiles, counter, counter + 1, BOTH, log_level)
+            counter += 2
+        if len(fingerprints) % 2 != 0:
+            process_pairs(fingerprints, profiles, -2, -1, SECOND, log_level)
     process_pairs_end = datetime.now()
     print_debug(a=["processed fingerprint pairs in: " + str(process_pairs_end - process_pairs_start)], log=log_level > 0, log_file=log_file)
 
@@ -405,6 +413,10 @@ def process_directory(file_paths=[], log_level=0, log_file=False, cleanup=True, 
     correct_errors(fingerprints, profiles, log_level, log_file)
     correct_errors_end = datetime.now()
     print_debug(a=["finished error correction in: " + str(correct_errors_end - correct_errors_start)], log=log_level > 0, log_file=log_file)
+
+    if ref_profile != None:
+        fingerprints.pop(0)
+        profiles.pop(0)
 
     # finally, automatically reject episodes with intros shorted than a specified length (default 15 seconds)
     # apply pre-roll if wanted
@@ -434,11 +446,12 @@ def process_directory(file_paths=[], log_level=0, log_file=False, cleanup=True, 
 def main(argv):
 
     path = ''
+    ref_path = ''
     log_level = 0
     cleanup = False
     log = False
     try:
-        opts, args = getopt.getopt(argv, "hi:dvcl")
+        opts, args = getopt.getopt(argv, "hi:dvclr:")
     except getopt.GetoptError:
         print_debug(['decode.py -i <path> -v (verbose - some logging) -d (debug - most logging) -c (cleanup) -s (slow mode) -l (log to file)\n'])
         sys.exit(2)
@@ -457,10 +470,14 @@ def main(argv):
             log_level = 1
         elif opt == '-c':
             cleanup = True
+        elif opt == '-r':
+            ref_path = arg
 
-    if path == '' or not Path(path).is_dir():
+    if (path == '' or not Path(path).is_dir()) or (ref_path != '' and not Path(ref_path).exists()):
         print_debug(['decode.py -i <path> -v (verbose - some logging) -d (debug - most logging) -c (cleanup) -s (slow mode) -l (log to file)\n'])
         sys.exit(2)
+
+    
 
     common_video_extensions = ['.webm', '.mkv', '.avi', '.mts', '.m2ts', '.ts', '.mov', '.wmv', '.mp4', '.m4v', '.mpg', '.mpeg', '.m2v']
 
@@ -476,7 +493,31 @@ def main(argv):
             file_paths.append(str(child.resolve()))
     file_paths.sort()
 
-    result = process_directory(file_paths=file_paths, log_level=log_level, log_file=log, cleanup=cleanup)
+    result = {}
+
+    max_episodes_per_season = 10
+    if ref_path == '' and len(file_paths) > max_episodes_per_season:
+        ref_profile_name = ''
+        for i in range(0, max_episodes_per_season):
+            ref_profile_name += replace(file_paths[i])
+        hash_object = hashlib.md5(ref_profile_name.encode())
+        ref_profile_name = hash_object.hexdigest()
+        ref_path = str(Path(data_path / 'fingerprints' / (ref_profile_name + '.json')))
+        print_debug(['processing the first %s episodes' % max_episodes_per_season])
+        result = process_directory(file_paths=file_paths[:max_episodes_per_season], ref_profile=None, log_level=log_level, log_file=log, cleanup=cleanup)
+
+        ref_profile = None
+        if ref_path != '':
+            with Path(ref_path).open('r') as profile_json:
+                ref_profile = json.load(profile_json)
+        print_debug(['processing the remaining episodes using ref profile %s' % ref_profile['path']])
+        result.extend(process_directory(file_paths=file_paths[max_episodes_per_season:], ref_profile=ref_profile, log_level=log_level, log_file=log, cleanup=cleanup))
+    else:
+        ref_profile = None
+        if ref_path != '':
+            with Path(ref_path).open('r') as profile_json:
+                ref_profile = json.load(profile_json)
+        result = process_directory(file_paths=file_paths, ref_profile=ref_profile, log_level=log_level, log_file=log, cleanup=cleanup)
     print(result)
 
 
