@@ -86,21 +86,21 @@ def get_jellyfin_shows():
         return []
     print_debug(a=['found %s shows' % len(shows)])
 
-    seasons = 0
-    episodes = 0
+    season_count = 0
+    episode_count = 0
     for show in shows:
         seasons = jellyfin_queries.get_seasons(client, path_map, show)
         if seasons:
-            seasons += len(seasons)
+            season_count += len(seasons)
         for season in seasons:
             season['Episodes'] = jellyfin_queries.get_episodes(client, path_map, season)
         if season['Episodes']:
-            episodes += len(season['Episodes'])
+            episode_count += len(season['Episodes'])
         show['Seasons'] = seasons
     jellyfin_logout()
 
-    print_debug(a=['found %s seasons' % seasons])
-    print_debug(a=['found %s episodes\n' % episodes])
+    print_debug(a=['found %s seasons' % season_count])
+    print_debug(a=['found %s episodes\n' % episode_count])
 
     return shows
 
