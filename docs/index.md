@@ -14,16 +14,18 @@ To account for jellyfin potentially using a different filesystem path to access 
 
 When running decode.py on its own, the -i parameter is used to specify a folder that contains video files. decode.py doesn't do any searching beyond that single folder, so typically the provided folder will be a "season folder" that contains all the video files for that season of a show.
 
+Individual shows or seasons can be ignored by creating an empty file named `.ignore-intros` inside its folder.
+
 ### Examples
-scan your jellyfin library, store the result in json, debug logging enabled, logging debug output to file enabled
+scan your jellyfin library, store the result in json, verbose logging enabled, logging debug output to file enabled
 
 `export JELLYFIN_URL="https://myurl" && export JELLYFIN_USERNAME="myusername" && export JELLYFIN_PASSWORD='mypassword'`
 
-`jellyfin.py -j -d -l`
+`jellyfin.py -j -v -l`
 
 or in reverse order
 
-`jellyfin.py -j -d -l --reverse`
+`jellyfin.py -j -v -l --reverse`
 
 monitor your jellyfin sessions and automatically skip intros using the stored json data
 

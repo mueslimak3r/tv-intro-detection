@@ -10,12 +10,18 @@ By default there is little/no output to stdout or stderr until the script has fi
 
 When using `jellyfin.py`, the results can be saved to `json` using the `-j` parameter. These will be saved in a sub-directory in `pwd`. Saving the results as json also allows them to be checked in subsequent runs to skip already processed files.
 
+Individual shows or seasons can be ignored by creating an empty file named `.ignore-intros` inside its folder.
+
 ### Examples
-scan your jellyfin library, store the result in json, debug logging enabled, logging debug output to file enabled
+scan your jellyfin library, store the result in json, verbose logging enabled, logging debug output to file enabled
 
 `export JELLYFIN_URL="https://myurl" && export JELLYFIN_USERNAME="myusername" && export JELLYFIN_PASSWORD='mypassword'`
 
-`jellyfin.py -j -d -l`
+`jellyfin.py -j -v -l`
+
+or in reverse order
+
+`jellyfin.py -j -v -l --reverse`
 
 monitor your jellyfin sessions and automatically skip intros using the stored json data
 

@@ -73,7 +73,48 @@ def get_path_map():
     return path_map
 
 
-def get_jellyfin_shows(reverse_sort=False):
+def check_season_valid(season=None, episodes=[], log_level=0, log_file=False):
+    if season is None or not episodes:
+        return []
+
+    path = data_path / 'jellyfin_cache' / str(season['SeriesId']) / str(season['SeasonId'])
+
+    file_paths = []
+    filtered_episodes = []
+    failed_to_find_files = False
+
+    if path.exists():
+        for episode in episodes:
+            if not Path(episode['Path']).exists():
+                failed_to_find_files = True
+                continue
+            if not Path(path / (str(episode['EpisodeId']) + '.json')).exists():
+                filtered_episodes.append(episode)
+    else:
+        for episode in episodes:
+            if not Path(episode['Path']).exists():
+                failed_to_find_files = True
+                continue
+            filtered_episodes.append(episode)
+
+    if failed_to_find_files:
+        print_debug(a=['season [%s] of show [%s] - failed to access some of the media files' % (season['Name'], season['SeriesName'])], log=log_level > 1)
+    if len(filtered_episodes) > 0 and len(episodes) - len(filtered_episodes) > 0:
+        print_debug(a=['season [%s] of show [%s] - will skip %s of %s episodes' % (season['Name'], season['SeriesName'], len(episodes) - len(filtered_episodes), len(episodes))], log=log_level > 0, log_file=log_file)
+    return filtered_episodes
+
+
+def get_file_paths(season=None):
+    if season is None or 'Episodes' not in season:
+        return []
+
+    file_paths = []
+    for episode in season['Episodes']:
+        file_paths.append(episode['Path'])
+    return file_paths
+
+
+def get_jellyfin_shows(reverse_sort=False, log_level=0, log_file=False):
     if server_url == '' or server_username == '' or server_password == '':
         print_debug(a=['missing server info'])
         return
@@ -81,27 +122,61 @@ def get_jellyfin_shows(reverse_sort=False):
     path_map = get_path_map()
 
     client = jellyfin_login(server_url, server_username, server_password, "TV Intro Detection Scanner")
-    shows = jellyfin_queries.get_shows(client, path_map, reverse_sort)
-    if not shows:
+    shows_query = jellyfin_queries.get_shows(client, path_map, reverse_sort)
+    if not shows_query:
         print_debug(a=['Error - got 0 shows from jellyfin'])
         return []
-    print_debug(a=['found %s shows' % len(shows)])
+    print_debug(a=['jellyfin has %s shows' % len(shows_query)])
 
+    shows = []
     season_count = 0
     episode_count = 0
-    for show in shows:
-        seasons = jellyfin_queries.get_seasons(client, path_map, show)
+    for show in shows_query:
+        should_skip_series = False
+        if 'Path' in show and show['Path'] and Path(show['Path']).is_dir():
+            for child in Path(show['Path']).iterdir():
+                if child.name == '.ignore-intros':
+                    print_debug(a=['ignoring series [%s]' % show['Name']], log=log_level > 0)
+                    should_skip_series = True
+                    break
+        if should_skip_series:
+            continue
+
+        seasons = []
+        seasons_query = jellyfin_queries.get_seasons(client, path_map, show)
+
+        if not seasons_query:
+            continue
+
+        for season in seasons_query:
+            should_skip_season = False
+            if 'Path' in season and season['Path'] and Path(season['Path']).is_dir():
+                for child in Path(season['Path']).iterdir():
+                    if child.name == '.ignore-intros':
+                        print_debug(a=['ignoring season [%s] of show [%s]' % (season['Name'], show['Name'])], log=log_level > 0)
+                        should_skip_season = True
+                        break
+            if should_skip_season:
+                continue
+
+            episodes = jellyfin_queries.get_episodes(client, path_map, season)
+            if not episodes:
+                continue
+
+            season['Episodes'] = check_season_valid(season, episodes, log_level, log_file)
+            if season['Episodes']:
+                episode_count += len(season['Episodes'])
+                seasons.append(season)
         if seasons:
             season_count += len(seasons)
-        for season in seasons:
-            season['Episodes'] = jellyfin_queries.get_episodes(client, path_map, season)
-        if season['Episodes']:
-            episode_count += len(season['Episodes'])
-        show['Seasons'] = seasons
+            show['Seasons'] = seasons
+            shows.append(show)
+
     jellyfin_logout()
 
-    print_debug(a=['found %s seasons' % season_count])
-    print_debug(a=['found %s episodes\n' % episode_count])
+    print_debug(a=['found %s valid shows' % len(shows)], log_file=log_file and episode_count > 0)
+    print_debug(a=['found %s valid seasons' % season_count], log_file=log_file and episode_count > 0)
+    print_debug(a=['found %s valid episodes\n' % episode_count], log_file=log_file and episode_count > 0)
 
     return shows
 
@@ -150,31 +225,13 @@ def save_season(season=None, result=None, save_json=False, debug=False, log_file
             print_debug(a=['index mismatch'], log_file=log_file)
 
 
-def check_json_cache(season=None, log_file=False):
-    path = data_path / 'jellyfin_cache' / str(season['SeriesId']) / str(season['SeasonId'])
-
-    file_paths = []
-
-    if path.exists():
-        filtered_episodes = []
-        for episode in season['Episodes']:
-            if not Path(path / (str(episode['EpisodeId']) + '.json')).exists():
-                filtered_episodes.append(episode)
-        print_debug(a=['processing %s of %s episodes' % (len(filtered_episodes), len(season['Episodes']))], log_file=log_file)
-        season['Episodes'] = filtered_episodes
-
-    for episode in season['Episodes']:
-        file_paths.append(episode['Path'])
-    return file_paths
-
-
 def process_jellyfin_shows(log_level=0, log_file=False, save_json=False, reverse_sort=False):
     start = datetime.now()
-    print_debug(a=["\n\nstarted new session at %s\n" % start], log_file=log_file)
+    print_debug(a=["\n\nstarted new session at %s\n" % start])
     if reverse_sort:
-        print_debug(['will process shows in reverse order'], log_file=log_file)
+        print_debug(['will process shows in reverse order'])
 
-    shows = get_jellyfin_shows(reverse_sort)
+    shows = get_jellyfin_shows(reverse_sort, log_level, log_file)
     
     if (data_path / 'fingerprints').is_dir():
         try:
@@ -183,50 +240,54 @@ def process_jellyfin_shows(log_level=0, log_file=False, save_json=False, reverse
             print_debug(a=["Error: %s : %s" % ('deleting fingerprints directory', e.strerror)], log_file=log_file)
 
     show_ndx = 1
+    total_processed = 0
     for show in shows:
-        print_debug(a=['%s/%s - %s' % (show_ndx, len(shows), show['Name'])], log_file=log_file)
         show_ndx += 1
         show_start_time = datetime.now()
 
+        print_debug(a=['%s/%s - %s' % (show_ndx, len(shows), show['Name'])], log_file=log_file)
+
         season_ndx = 1
         for season in show['Seasons']:
-            print_debug(a=['%s/%s - %s - %s episodes' % (season_ndx, len(show['Seasons']), season['Name'], len(season['Episodes']))], log_file=log_file)
             season_ndx += 1
 
             if len(season['Episodes']) < 2:
-                print_debug(a=['skipping season since it doesn\'t contain at least 2 episodes'], log_file=log_file)
+                print_debug(a=['skipping season [%s] since it doesn\'t contain at least 2 episodes' % season['Name']], log_file=log_file)
                 continue
             if len(season['Episodes']) > maximum_episodes_per_season:
-                print_debug(a=['skipping season since it contains %s episodes (more than max %s)' % (len(season['Episodes']), maximum_episodes_per_season)], log_file=log_file)
+                print_debug(a=['skipping season [%s] since it contains %s episodes (more than max %s)' % (season['Name'], len(season['Episodes']), maximum_episodes_per_season)], log_file=log_file)
                 continue
             if season['Episodes'][0]['Duration'] < minimum_episode_duration * 60 * 1000:
-                print_debug(a=['skipping season since episodes are too short (%s) (less than minimum %s minutes)' % (len(season['Episodes']), minimum_episode_duration)], log_file=log_file)
+                print_debug(a=['skipping season [%s] since episodes are too short (%s) (less than minimum %s minutes)' % (season['Name'], len(season['Episodes']), minimum_episode_duration)], log_file=log_file)
                 continue
 
             season_start_time = datetime.now()
-            file_paths = check_json_cache(season, log_file)
+            file_paths = get_file_paths(season)
+            result = []
+
             if file_paths:
-                result = process_directory(file_paths=file_paths, cleanup=False, log_level=log_level, log_file=log_file, log_timestamp=session_timestamp)
+                print_debug(a=['%s/%s - %s - %s episodes' % (season_ndx, len(show['Seasons']), season['Name'], len(season['Episodes']))], log_file=log_file)
+                result = process_directory(file_paths=file_paths, cleanup=False, log_level=2 if log_level > 0 else 0, log_file=log_file, log_timestamp=session_timestamp)
                 if result:
                     save_season(season, result, save_json, log_level > 0, log_file)
+                    total_processed += len(result)
                 else:
                     print_debug(a=['no results - the decoder may not have access to the specified media files'], log_file=log_file)
-            else:
-                print_debug(a=['all files were excluded - they either can\'t be found or were previously processed'], log_file=log_file)
             if (data_path / 'fingerprints').is_dir():
                 try:
                     shutil.rmtree(data_path / 'fingerprints')
                 except OSError as e:
                     print_debug(a=["Error: %s : %s" % ('deleting fingerprints directory', e.strerror)], log_file=log_file)
             season_end_time = datetime.now()
-            print_debug(a=['processed season [%s] in %s' % (season['Name'], str(season_end_time - season_start_time))], log_file=log_file)
+            if result:
+                print_debug(a=['processed season [%s] in %s' % (season['Name'], str(season_end_time - season_start_time))], log_file=log_file)
             if file_paths:
                 sleep(2)
         show_end_time = datetime.now()
-        print_debug(a=['processed show [%s] in %s' % (show['Name'], str(show_end_time - show_start_time))], log_file=log_file)
+        print_debug(a=['processed show [%s] in %s\n' % (show['Name'], str(show_end_time - show_start_time))], log_file=log_file)
 
     end = datetime.now()
-    print_debug(a=["total runtime: " + str(end - start)], log_file=log_file)
+    print_debug(a=["total runtime: " + str(end - start)], log_file=log_file and total_processed > 0)
     if sleep_after_finish_sec > 0:
         print_debug(a=['sleeping for %s seconds' % sleep_after_finish_sec])
         sleep(300)
