@@ -81,6 +81,7 @@ docker run -d \
 | Optional | ```-e DATA_DIR=/config/data``` | Use a different directory to store cached data. Modifying this will likely require a new path mapping such as ```-v /path/to/data:/data``` |
 |---
 | Optional | ```-e LOG_LEVEL=INFO/VERBOSE/DEBUG``` | Change the log level (default is verbose for docker) |
+| Optional | ```-e AUTO_SKIP_COOLDOWN=4``` | Specify the cooldown time (seconds) for the auto skipper (default 2) |
 {:.table-striped}
 
 ### Docker with network shares

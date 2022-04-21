@@ -15,7 +15,7 @@ server_username = os.environ['JELLYFIN_USERNAME'] if 'JELLYFIN_USERNAME' in os.e
 server_password = os.environ['JELLYFIN_PASSWORD'] if 'JELLYFIN_PASSWORD' in os.environ else ''
 
 mon_all_users = os.environ['MONITOR_ALL_USERS'] if 'MONITOR_ALL_USERS' in os.environ else ''
-env_cooldown_str = os.environ['COOLDOWN_SEC'] if 'COOLDOWN_SEC' in os.environ else ''
+env_cooldown_str = os.environ['AUTO_SKIP_COOLDOWN'] if 'AUTO_SKIP_COOLDOWN' in os.environ else ''
 
 config_path = Path(os.environ['CONFIG_DIR']) if 'CONFIG_DIR' in os.environ else Path(Path.cwd() / 'config')
 data_path = Path(os.environ['DATA_DIR']) if 'DATA_DIR' in os.environ else Path(config_path / 'data')
