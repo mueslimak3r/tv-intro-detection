@@ -10,3 +10,5 @@ ENTRYPOINT ["python"]
 CMD [ "-u", "jellyfin_auto_skip.py", "-a", "-c", "2" ]
 
 VOLUME /app/config
+
+
