@@ -7,6 +7,6 @@ RUN pip install --no-cache-dir wheel
 RUN pip install --no-cache-dir -r /app/requirements.txt
 WORKDIR /app
 ENTRYPOINT ["python"]
-CMD [ "-u", "jellyfin_auto_skip.py", "-a" ]
+CMD [ "-u", "jellyfin_auto_skip.py", "-a", "-c", "2" ]
 
 VOLUME /app/config

@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - 'jellyfin_auto_skip.py'
+      - 'Dockerfile_Jellyfin-Intro-Skipper'
 
 env:
   IMAGE_NAME_SKIPPER: jellyfin-intro-skipper

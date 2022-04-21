@@ -15,6 +15,7 @@ server_username = os.environ['JELLYFIN_USERNAME'] if 'JELLYFIN_USERNAME' in os.e
 server_password = os.environ['JELLYFIN_PASSWORD'] if 'JELLYFIN_PASSWORD' in os.environ else ''
 
 mon_all_users = os.environ['MONITOR_ALL_USERS'] if 'MONITOR_ALL_USERS' in os.environ else ''
+env_cooldown_str = os.environ['COOLDOWN_SEC'] if 'COOLDOWN_SEC' in os.environ else ''
 
 config_path = Path(os.environ['CONFIG_DIR']) if 'CONFIG_DIR' in os.environ else Path(Path.cwd() / 'config')
 data_path = Path(os.environ['DATA_DIR']) if 'DATA_DIR' in os.environ else Path(config_path / 'data')
@@ -22,6 +23,7 @@ data_path = Path(os.environ['DATA_DIR']) if 'DATA_DIR' in os.environ else Path(c
 TICKS_PER_MS = 10000
 preroll_seconds = 3
 minimum_intro_length = 10  # seconds
+cooldown_time = 5
 
 client = None
 should_exit = False
@@ -151,17 +153,19 @@ def monitor_loop(monitor_all_users=False):
     if server_url == '' or server_username == '' or server_password == '':
         print('missing server info')
         return
-    
+
     init_client()
     if should_exit:
         return
 
     print('will monitor [%s]' % ('all users' if monitor_all_users else 'current user'))
+    print('cooldown between check-ins is set to %s seconds' % cooldown_time)
     print('listening for jellyfin sessions...')
     while not should_exit:
         if not monitor_sessions(monitor_all_users) and not should_exit:
             init_client()
-        sleep(5)
+        sleep(cooldown_time)
+
     if client is not None:
         try:
             jellyfin_logout()
@@ -172,10 +176,12 @@ def monitor_loop(monitor_all_users=False):
 
 
 def main(argv):
+    global cooldown_time
+
     all_users = mon_all_users
 
     try:
-        opts, args = getopt.getopt(argv, "ha")
+        opts, args = getopt.getopt(argv, 'hac:', ['cooldown'])
     except getopt.GetoptError:
         print('jellyfin_auto_skip.py -a (all users)\n')
         sys.exit(2)
@@ -186,6 +192,11 @@ def main(argv):
             sys.exit()
         elif opt == '-a':
             all_users = True
+        elif opt in ('-c', '--cooldown'):
+            if arg != '' and arg.isnumeric():
+                cooldown_nb = int(arg)
+                if cooldown_nb > 0 and cooldown_nb < 300:
+                    cooldown_time = cooldown_nb
     
     if server_url == '' or server_username == '' or server_password == '':
         print('you need to export env variables: JELLYFIN_URL, JELLYFIN_USERNAME, JELLYFIN_PASSWORD\n')
@@ -195,6 +206,11 @@ def main(argv):
         all_users = True
     elif mon_all_users == 'FALSE':
         all_users = False
+    
+    if env_cooldown_str != '' and env_cooldown_str.isnumeric():
+        cooldown_nb = int(env_cooldown_str)
+        if cooldown_nb > 0 and cooldown_nb < 300:
+            cooldown_time = cooldown_nb
 
     monitor_loop(all_users)
 

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'jellyfin_auto_skip.py'
+      - 'Dockerfile_Jellyfin-Intro-Skipper'
 
 env:
   IMAGE_NAME_Skipper: jellyfin-intro-skipper-test
