@@ -20,7 +20,6 @@ config_path = Path(os.environ['CONFIG_DIR']) if 'CONFIG_DIR' in os.environ else 
 data_path = Path(os.environ['DATA_DIR']) if 'DATA_DIR' in os.environ else Path(config_path / 'data')
 
 TICKS_PER_MS = 10000
-
 preroll_seconds = 3
 minimum_intro_length = 10  # seconds
 
