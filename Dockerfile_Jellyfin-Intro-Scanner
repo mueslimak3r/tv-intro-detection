@@ -10,3 +10,4 @@ ENTRYPOINT ["python"]
 CMD [ "-u", "jellyfin.py", "-j", "-v", "-l" ]
 
 VOLUME /app/config
+
