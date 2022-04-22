@@ -27,7 +27,7 @@ preroll_seconds = 0     # adjust the end time to return n seconds prior to the c
 max_fingerprint_mins = 10
 min_intro_length_sec = 10
 max_intro_length_sec = 180
-check_frame = 10  # 1 (slow) to 10 (fast) is fine
+check_frame = 1  # 1 (slow) to 10 (fast) is fine
 workers = 4  # number of executors to use
 target_image_height = 180  # scale frames to height of 180px
 
@@ -83,7 +83,7 @@ def get_timestamp_from_frame(profile):
 def create_video_fingerprint(profile, log_level, log_file):
     video_fingerprint = ''
 
-    quarter_frames_or_first_X_mins = min(int(profile['total_frames'] / 4), int(profile['fps'] * 60 * max_fingerprint_mins))
+    quarter_frames_or_first_X_mins = min(int(floor((profile['total_frames'] / 4) / profile['fps'])), 60 * max_fingerprint_mins)
     video_fingerprint = get_fingerprint_ffmpeg(profile['path'], quarter_frames_or_first_X_mins, log_level, log_file, session_timestamp, False)
 
     return video_fingerprint
@@ -99,7 +99,7 @@ def get_equal_frames(print1, print2, start1, start2):
     return equal_frames
 
 
-def get_start_end(print1, print2):
+def get_start_end(print1, print1_fps, print2, print2_fps):
     if print1 == '' or print2 == '':
         return (0, 0), (0, 0)
     
@@ -115,7 +115,7 @@ def get_start_end(print1, print2):
             highest_equal_frames = equal_frames
 
     if highest_equal_frames:
-        return (highest_equal_frames[0][0][0], highest_equal_frames[-1][0][0]), (highest_equal_frames[0][0][1], highest_equal_frames[-1][0][1])
+        return (floor(highest_equal_frames[0][0][0] * print1_fps), floor(highest_equal_frames[-1][0][0] * print1_fps)), (floor(highest_equal_frames[0][0][1] * print2_fps), floor(highest_equal_frames[-1][0][1] * print2_fps))
     else:
         return (0, 0), (0, 0)
 
@@ -313,7 +313,7 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
 
 def process_pairs(fingerprints, profiles, ndx_1, ndx_2, mode, log_level):
 
-    start_end = get_start_end(fingerprints[ndx_1], fingerprints[ndx_2])
+    start_end = get_start_end(fingerprints[ndx_1], profiles[ndx_1]['fps'], fingerprints[ndx_2], profiles[ndx_2]['fps'])
 
     if mode == BOTH or mode == FIRST:
         profiles[ndx_1]['start_frame'] = start_end[0][0]
