@@ -121,7 +121,7 @@ def check_season_valid(season=None, episodes=[], log_level=0, log_file=False):
     if not filtered_episodes:
         return []
     if len(filtered_episodes) > maximum_episodes_per_season:
-        print_debug(a=['skipping season [%s] since it contains %s episodes (more than max %s)' % (season['Name'], len(filtered_episodes), maximum_episodes_per_season)], log=log_level > 1)
+        print_debug(a=['skipping season [%s] of show [%s] since it contains %s episodes (more than max %s)' % (season['Name'], season['SeriesName'], len(filtered_episodes), maximum_episodes_per_season)], log=log_level > 1)
         return []
     
     duration_mins = int(filtered_episodes[0]['Duration'])
