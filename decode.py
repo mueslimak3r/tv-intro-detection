@@ -92,7 +92,9 @@ def create_video_fingerprint(profile, log_level, log_file):
 def get_equal_frames(print1, print2, start1, start2):
     equal_frames = []
 
-    for j in range(0, int(len(print1) / 16 / check_frame)):
+    search_range = int(floor(min(len(print1), len(print2)) / 16 / check_frame))
+
+    for j in range(0, search_range):
         if print1[j * 16 * check_frame:j * 16 * check_frame + 16] == print2[
                 j * 16 * check_frame:j * 16 * check_frame + 16]:
             equal_frames.append(((int(start1 + (j * check_frame)), int(start2 + (j * check_frame))), print1[j * 16 * check_frame:j * 16 * check_frame + 16]))
@@ -103,19 +105,31 @@ def get_start_end(print1, print2):
     if print1 == '' or print2 == '':
         return (0, 0), (0, 0)
     
-    search_range = min(len(print1), len(print2))
+    shortest_len = int(min(len(print1), len(print2)))
+
+    if len(print2) == shortest_len:
+        longest = print1
+        shortest = print2
+    else:
+        longest = print2
+        shortest = print1
 
     highest_equal_frames = []
-    for k in range(1, int(search_range / 16)):
-        equal_frames = get_equal_frames(print1[-k * 16:], print2, int(search_range / 16) - k, 0)
+    for k in range(1, int(floor(len(longest) / 16))):
+        equal_frames = get_equal_frames(longest[-k * 16:], shortest, int(floor(len(longest) / 16)) - k, 0)
         if len(equal_frames) > len(highest_equal_frames):
             highest_equal_frames = equal_frames
-        equal_frames = get_equal_frames(print1, print2[k * 16:], 0, k)
-        if len(equal_frames) > len(highest_equal_frames):
-            highest_equal_frames = equal_frames
+        
+        if k * 16 < len(shortest):
+            equal_frames = get_equal_frames(longest, shortest[k * 16:], 0, k)
+            if len(equal_frames) > len(highest_equal_frames):
+                highest_equal_frames = equal_frames
 
     if highest_equal_frames:
-        return (highest_equal_frames[0][0][0], highest_equal_frames[-1][0][0]), (highest_equal_frames[0][0][1], highest_equal_frames[-1][0][1])
+        if len(print2) == shortest_len:
+            return (highest_equal_frames[0][0][0], highest_equal_frames[-1][0][0]), (highest_equal_frames[0][0][1], highest_equal_frames[-1][0][1])
+        else:
+            return (highest_equal_frames[0][0][1], highest_equal_frames[-1][0][1]), (highest_equal_frames[0][0][0], highest_equal_frames[-1][0][0])
     else:
         return (0, 0), (0, 0)
 
@@ -383,8 +397,8 @@ def process_directory(file_paths=[], ref_profile=None, log_level=0, log_file=Fal
         print_debug(a=['fewer than 2 valid fingerprints were found - skipping'], log=log_level > 0, log_file=log_file)
         return {}
 
-    if ref_profile != None:
-        fingerprints.insert(0, ref_profile['fingerprint'])
+    if ref_profile is not None:
+        fingerprints.insert(0, ref_profile['fingerprint'][int(ref_profile['start_frame']) * 16:(int(ref_profile['end_frame']) + 1) * 16])
         ref_profile.pop('fingerprint', None)
         profiles.insert(0, ref_profile)
 
@@ -397,7 +411,7 @@ def process_directory(file_paths=[], ref_profile=None, log_level=0, log_file=Fal
     # ...overwriting the the start/end frame values for the reference profile
     counter = 0
     process_pairs_start = datetime.now()
-    if ref_profile != None:
+    if ref_profile is not None:
         for i in range(1, len(fingerprints)):
             process_pairs(fingerprints, profiles, 0, i, SECOND, log_level)
     else:
@@ -414,7 +428,7 @@ def process_directory(file_paths=[], ref_profile=None, log_level=0, log_file=Fal
     correct_errors_end = datetime.now()
     print_debug(a=["finished error correction in: " + str(correct_errors_end - correct_errors_start)], log=log_level > 0, log_file=log_file)
 
-    if ref_profile != None:
+    if ref_profile is not None:
         fingerprints.pop(0)
         profiles.pop(0)
 
@@ -476,8 +490,6 @@ def main(argv):
     if (path == '' or not Path(path).is_dir()) or (ref_path != '' and not Path(ref_path).exists()):
         print_debug(['decode.py -i <path> -v (verbose - some logging) -d (debug - most logging) -c (cleanup) -s (slow mode) -l (log to file)\n'])
         sys.exit(2)
-
-    
 
     common_video_extensions = ['.webm', '.mkv', '.avi', '.mts', '.m2ts', '.ts', '.mov', '.wmv', '.mp4', '.m4v', '.mpg', '.mpeg', '.m2v']
 

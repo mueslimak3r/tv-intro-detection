@@ -259,6 +259,7 @@ def save_season(season=None, result=None, save_json=False, debug=False, log_file
         elif debug:
             print_debug(a=['index mismatch'], log_file=log_file)
 
+
 def get_season_fingerprint(season=None, debug=False, log_file=False):
     if season is None:
         return
@@ -269,6 +270,7 @@ def get_season_fingerprint(season=None, debug=False, log_file=False):
         with path.open('r') as json_file:
             season_fingerprint = json.load(json_file)
     return season_fingerprint
+
 
 def process_jellyfin_shows(log_level=0, log_file=False, save_json=False, reverse_sort=False):
     start = datetime.now()
