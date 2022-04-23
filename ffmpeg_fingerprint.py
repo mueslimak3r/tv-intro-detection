@@ -34,14 +34,14 @@ def replace(s):
     return re.sub('[^A-Za-z0-9]+', '', s)
 
 
-def get_frames(path, frame_nb, log_level, log_file):
+def get_frames(path, hash_fps, frame_nb, log_level, log_file):
     if path is None or path == '' or frame_nb == 0:
         return False
     print_debug(a=['running ffmpeg'], log=log_level > 0, log_file=log_file)
     start = datetime.now()
-    filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / 'frame-%08d.bmp')
+    filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / 'frame-%08d.png')
     with Path(os.devnull).open('w') as fp:
-        process = subprocess.Popen(args=["ffmpeg", "-i", path, "-vf", "select='if(eq(n\,0),1,floor(t)-floor(prev_selected_t))'", "-frames:v", str(frame_nb), "-s", "384x216", "-vsync", "0", str(filename)], stdout=fp, stderr=fp)
+        process = subprocess.Popen(args=["ffmpeg", "-i", path, "-r", str(hash_fps), "-frames:v", str(frame_nb), "-s", "384x216", str(filename)], stdout=fp, stderr=fp)
         process.wait()
         end = datetime.now()
         print_debug(a=["ran ffmpeg in %s" % str(end - start)], log=log_level > 0, log_file=log_file)
@@ -50,13 +50,13 @@ def get_frames(path, frame_nb, log_level, log_file):
 
 def check_frames_already_exist(path, frame_nb):
     for ndx in range(1, frame_nb + 1):
-        filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / ('frame-%s.bmp' % str(ndx).rjust(8, '0')))
+        filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / ('frame-%s.png' % str(ndx).rjust(8, '0')))
         if not filename.exists():
             return False
     return True
 
 
-def get_fingerprint_ffmpeg(path, frame_nb, log_level=1, log_file=False, log_timestamp=None, cleanup=False):
+def get_fingerprint_ffmpeg(path, hash_fps, frame_nb, log_level=1, log_file=False, log_timestamp=None, cleanup=False):
     global session_timestamp
 
     if path is None or path == '' or frame_nb == 0:
@@ -67,7 +67,7 @@ def get_fingerprint_ffmpeg(path, frame_nb, log_level=1, log_file=False, log_time
 
     Path(data_path / 'fingerprints' / replace(path) / 'frames').mkdir(parents=True, exist_ok=True)
     if not check_frames_already_exist(path, frame_nb):
-        if not get_frames(path, frame_nb, log_level, log_file):
+        if not get_frames(path, hash_fps, frame_nb, log_level, log_file):
             print_debug(a=['ffmpeg error'], log=log_level > 0, log_file=log_file)
             return ''
     else:
@@ -76,7 +76,7 @@ def get_fingerprint_ffmpeg(path, frame_nb, log_level=1, log_file=False, log_time
     start = datetime.now()
     video_fingerprint = ""
     for ndx in range(1, frame_nb + 1):
-        filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / ('frame-%s.bmp' % str(ndx).rjust(8, '0')))
+        filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / ('frame-%s.png' % str(ndx).rjust(8, '0')))
         if not filename.exists():
             print_debug(a=["Error - Possible Corruption - frame file missing: %s for video %s" % (filename, path)], log=log_level > 0, log_file=log_file)
             break
