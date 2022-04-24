@@ -200,6 +200,7 @@ def save_season_fingerprint(fingerprints, profiles, ndx, filtered_lengths, short
     season_fingerprint['reference_duration'] = shortest_duration
     season_fingerprint['average_frames'] = average
     season_fingerprint['average_sample_size'] = len(filtered_lengths)
+    season_fingerprint['hash_fps'] = hash_fps
 
     path = Path(data_path / 'fingerprints' / (name + '.json'))
     Path(data_path / 'fingerprints').mkdir(parents=True, exist_ok=True)
