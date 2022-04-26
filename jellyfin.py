@@ -90,13 +90,12 @@ def get_path_map(log_level=0):
     return path_map
 
 
-def check_season_valid(season=None, episodes=[], log_level=0, log_file=False):
+def check_season_valid(season=None, episodes=[], repair=False, log_level=0, log_file=False):
     if season is None or not episodes:
         return []
 
     path = data_path / 'jellyfin_cache' / str(season['SeriesId']) / str(season['SeasonId'])
 
-    file_paths = []
     filtered_episodes = []
     failed_to_find_files = False
 
@@ -105,7 +104,20 @@ def check_season_valid(season=None, episodes=[], log_level=0, log_file=False):
             if not Path(episode['Path']).exists():
                 failed_to_find_files = True
                 continue
-            if not Path(path / (str(episode['EpisodeId']) + '.json')).exists():
+
+            should_add = True
+            if Path(path / (str(episode['EpisodeId']) + '.json')).exists():
+                should_add = False
+                if repair:
+                    with Path(path / (str(episode['EpisodeId']) + '.json')).open('r') as json_file:
+                        profile = json.load(json_file)
+                        if 'start_frame' in profile and 'end_frame' in profile:
+                            start_frame = int(profile['start_frame'])
+                            end_frame = int(profile['end_frame'])
+                            if start_frame == 0 and end_frame == 0:
+                                should_add = True
+                                print_debug(a=['will repair ep [%s] of season [%s] of show [%s]' % (episode['Name'], season['Name'], season['SeriesName'])], log=log_level > 1)
+            if should_add:
                 filtered_episodes.append(episode)
     else:
         for episode in episodes:
@@ -130,7 +142,9 @@ def check_season_valid(season=None, episodes=[], log_level=0, log_file=False):
     if filtered_episodes[0]['Duration'] < minimum_episode_duration * 60 * 1000:
         print_debug(a=['skipping season [%s] of show [%s] - episodes are too short (%s minutes) (less than minimum %s minutes)' % (season['Name'], season['SeriesName'], duration_mins, minimum_episode_duration)], log=log_level > 1)
         return []
-    if len(filtered_episodes) < 2:
+    
+    season_hash_exists = 1 if Path(path / 'season.json').exists() else 0
+    if len(filtered_episodes) + season_hash_exists < 2:
         print_debug(a=['skipping season [%s] of show [%s] - it doesn\'t contain at least 2 episodes' % (season['Name'], season['SeriesName'])], log=log_level > 1)
         return []
 
@@ -149,7 +163,7 @@ def get_file_paths(season=None):
     return file_paths
 
 
-def get_jellyfin_shows(reverse_sort=False, log_level=0, log_file=False):
+def get_jellyfin_shows(reverse_sort=False, repair=False, log_level=0, log_file=False):
     if server_url == '' or server_username == '' or server_password == '':
         print_debug(a=['missing server info'])
         return
@@ -162,6 +176,8 @@ def get_jellyfin_shows(reverse_sort=False, log_level=0, log_file=False):
         print_debug(a=['Error - got 0 shows from jellyfin'])
         return []
     print_debug(a=['jellyfin has %s shows' % len(shows_query)])
+    if repair:
+        print_debug(a=['repair mode is enabled'])
 
     shows = []
     season_count = 0
@@ -198,7 +214,7 @@ def get_jellyfin_shows(reverse_sort=False, log_level=0, log_file=False):
             if not episodes:
                 continue
 
-            season['Episodes'] = check_season_valid(season, episodes, log_level, log_file)
+            season['Episodes'] = check_season_valid(season, episodes, repair, log_level, log_file)
             if season['Episodes']:
                 episode_count += len(season['Episodes'])
                 seasons.append(season)
@@ -214,6 +230,18 @@ def get_jellyfin_shows(reverse_sort=False, log_level=0, log_file=False):
     print_debug(a=['found %s qualifying episodes\n' % episode_count], log_file=log_file and episode_count > 0)
 
     return shows
+
+
+def get_season_fingerprint(season=None, debug=False, log_file=False):
+    if season is None:
+        return
+    
+    season_fingerprint = None
+    path = Path(data_path / 'jellyfin_cache' / str(season['SeriesId']) / str(season['SeasonId']) / ('season' + '.json'))
+    if path.exists():
+        with path.open('r') as json_file:
+            season_fingerprint = json.load(json_file)
+    return season_fingerprint
 
 
 def copy_season_fingerprint(result: list = [], dir_path: Path = None, debug: bool = False, log_file: bool = False):
@@ -260,13 +288,13 @@ def save_season(season=None, result=None, save_json=False, debug=False, log_file
             print_debug(a=['index mismatch'], log_file=log_file)
 
 
-def process_jellyfin_shows(log_level=0, log_file=False, save_json=False, reverse_sort=False):
+def process_jellyfin_shows(log_level=0, log_file=False, save_json=False, reverse_sort=False, repair=False):
     start = datetime.now()
     print_debug(a=["\n\nstarted new session at %s\n" % start])
     if reverse_sort:
         print_debug(['will process shows in reverse order'])
 
-    shows = get_jellyfin_shows(reverse_sort, log_level, log_file)
+    shows = get_jellyfin_shows(reverse_sort, repair, log_level, log_file)
     
     if (data_path / 'fingerprints').is_dir():
         try:
@@ -293,6 +321,8 @@ def process_jellyfin_shows(log_level=0, log_file=False, save_json=False, reverse
             if file_paths:
                 print_debug(a=['%s/%s - %s - %s episodes' % (season_ndx, len(show['Seasons']), season['Name'], len(season['Episodes']))], log_file=log_file)
                 result = process_directory(file_paths=file_paths, cleanup=False, log_level=log_level, log_file=log_file, log_timestamp=session_timestamp)
+                result = process_directory(file_paths=file_paths, ref_profile=get_season_fingerprint(season=season, debug=log_level > 0, log_file=log_file),
+                                           cleanup=False, log_level=log_level, log_file=log_file, log_timestamp=session_timestamp)
                 if result:
                     save_season(season, result, save_json, log_level > 0, log_file)
                     total_processed += len(result)
@@ -323,9 +353,10 @@ def main(argv):
     save_json = False
     log = False
     reverse_sort = False
+    repair = False
 
     try:
-        opts, args = getopt.getopt(argv, "hdvjlr", ["reverse"])
+        opts, args = getopt.getopt(argv, "hdvjlr", ["reverse", "repair"])
     except getopt.GetoptError:
         print_debug(['jellyfin.py -d (debug) -j (save json) -l (log to file)'])
         print_debug(['saving to json is currently the only way to skip previously processed files in subsequent runs\n'])
@@ -346,6 +377,8 @@ def main(argv):
             log = True
         elif opt in ("-r", "--reverse"):
             reverse_sort = True
+        elif opt in ("--repair"):
+            repair = True
     
     if server_url == '' or server_username == '' or server_password == '':
         print_debug(['you need to export env variables: JELLYFIN_URL, JELLYFIN_USERNAME, JELLYFIN_PASSWORD\n'])
@@ -362,7 +395,7 @@ def main(argv):
         log_level = 1
     elif env_log_level_str == 'INFO':
         log_level = 0
-    process_jellyfin_shows(log_level, log, save_json, reverse_sort)
+    process_jellyfin_shows(log_level, log, save_json, reverse_sort, repair)
 
 
 if __name__ == "__main__":
