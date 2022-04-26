@@ -320,7 +320,6 @@ def process_jellyfin_shows(log_level=0, log_file=False, save_json=False, reverse
 
             if file_paths:
                 print_debug(a=['%s/%s - %s - %s episodes' % (season_ndx, len(show['Seasons']), season['Name'], len(season['Episodes']))], log_file=log_file)
-                result = process_directory(file_paths=file_paths, cleanup=False, log_level=log_level, log_file=log_file, log_timestamp=session_timestamp)
                 result = process_directory(file_paths=file_paths, ref_profile=get_season_fingerprint(season=season, debug=log_level > 0, log_file=log_file),
                                            cleanup=False, log_level=log_level, log_file=log_file, log_timestamp=session_timestamp)
                 if result:
