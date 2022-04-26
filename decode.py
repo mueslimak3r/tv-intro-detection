@@ -208,6 +208,13 @@ def save_season_fingerprint(fingerprints, profiles, ndx, filtered_lengths, short
         json.dump(season_fingerprint, json_file, indent=4)
 
 
+def intro_duration(profile):
+    intro_duration = profile['end_frame'] - profile['start_frame']
+    if intro_duration < 0:
+        intro_duration = 0
+    return intro_duration
+
+
 def reject_outliers(input_list, iq_range=0.2):
     if not input_list:
         return input_list
@@ -228,10 +235,10 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
     # build a list of intro lengths with outliers rejected
     lengths = []
     for profile in profiles:
-        if profile['intro_duration'] <= int(profile['fps'] * max_intro_length_sec) and \
-                profile['intro_duration'] > int(profile['fps'] * 2):
+        if intro_duration(profile) <= int(profile['fps'] * max_intro_length_sec) and \
+                intro_duration(profile) > int(profile['fps'] * 2):
 
-            lengths.append(profile['intro_duration'])
+            lengths.append(intro_duration(profile))
         else:
             print_debug(a=['excluding profile from pool of durations due to it being to long or short %s start %s end %s' % (profile['path'], profile['start_frame'], profile['end_frame'])], log=log_level > 1, log_file=log_file)
             print_timestamp(profile['path'], profile['start_frame'], profile['end_frame'], profile['fps'], log_level, log_file)
@@ -265,11 +272,11 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
     conforming_profiles = []
     non_conforming_profiles = []
     for ndx in range(0, len(profiles)):
-        diff_from_avg = abs(profiles[ndx]['intro_duration'] - average)
+        diff_from_avg = abs(intro_duration(profiles[ndx]) - average)
         print_debug(a=['file [%s] diff from average %s' % (profiles[ndx]['path'], diff_from_avg)], log=log_level > 1, log_file=log_file)
-        if profiles[ndx]['intro_duration'] in filtered_lengths or \
+        if intro_duration(profiles[ndx]) in filtered_lengths or \
                 diff_from_avg < int(15 * profiles[ndx]['fps']):
-            conforming_profiles.append((ndx, profiles[ndx]['intro_duration']))
+            conforming_profiles.append((ndx, intro_duration(profiles[ndx])))
         else:
             print_debug(a=['\nrejected file [%s] with start %s end %s' % (profiles[ndx]['path'], profiles[ndx]['start_frame'], profiles[ndx]['end_frame'])], log_file=log_file)
             print_timestamp(profiles[ndx]['path'], profiles[ndx]['start_frame'], profiles[ndx]['end_frame'], profiles[ndx]['fps'], log_level, log_file)
@@ -287,7 +294,7 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
     # sort the list of conforming profile indexes and find the mean value
     # this profile will be the reference profile used when repairing the rejected profiles
     conforming_profiles.sort(key=sort_conforming_profile)
-    shortest_duration = profiles[conforming_profiles[0][0]]['intro_duration']
+    shortest_duration = intro_duration(profiles[conforming_profiles[0][0]])
     print_debug(a=['shortest duration %s from %s' % (shortest_duration, profiles[conforming_profiles[0][0]]['path'])], log=log_level > 0, log_file=log_file)
     ref_profile_ndx = conforming_profiles[int(floor(len(conforming_profiles) / 2))][0]
 
@@ -319,18 +326,18 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
     # repeat building a list of lengths and filtering them
     lengths = []
     for profile in profiles:
-        lengths.append(profile['intro_duration'])
+        lengths.append(intro_duration(profile))
     new_filtered_lengths = reject_outliers(lengths)
     
     # repeat checking each profile's duration against the new filtered list of lengths
     repaired = 0
     for nprofile in range(0, len(profiles)):
-        diff_from_avg = abs(profiles[nprofile]['intro_duration'] - average)
+        diff_from_avg = abs(intro_duration(profiles[nprofile]) - average)
         guessed_start = profiles[nprofile]['end_frame'] - shortest_duration
         if guessed_start < 0:
             guessed_start = 0
         guessed_start_diff = abs(profiles[nprofile]['end_frame'] - guessed_start - average)
-        if profiles[nprofile]['intro_duration'] in new_filtered_lengths and \
+        if intro_duration(profiles[nprofile]) in new_filtered_lengths and \
                 diff_from_avg < int(15 * profiles[nprofile]['fps']):
 
             if nprofile in non_conforming_profiles:
@@ -368,10 +375,6 @@ def process_pairs(fingerprints, profiles, ndx_1, ndx_2, mode, log_level, log_fil
             print_debug(a=["end frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_1]['end_frame'], profiles[ndx_1]['path'])], log=log_level > 1)
             profiles[ndx_1]['end_frame'] = 0
 
-        profiles[ndx_1]['intro_duration'] = profiles[ndx_1]['end_frame'] - profiles[ndx_1]['start_frame']
-        if profiles[ndx_1]['intro_duration'] < 0:
-            profiles[ndx_1]['intro_duration'] = 0
-
         print_timestamp(profiles[ndx_1]['path'], profiles[ndx_1]['start_frame'], profiles[ndx_1]['end_frame'], profiles[ndx_1]['fps'], log_level, log_file)
 
     if mode == BOTH or mode == SECOND:
@@ -384,10 +387,6 @@ def process_pairs(fingerprints, profiles, ndx_1, ndx_2, mode, log_level, log_fil
         if profiles[ndx_2]['end_frame'] < 0:
             print_debug(a=["end frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_2]['end_frame'], profiles[ndx_2]['path'])], log=log_level > 1)
             profiles[ndx_2]['end_frame'] = 0
-
-        profiles[ndx_2]['intro_duration'] = profiles[ndx_2]['end_frame'] - profiles[ndx_2]['start_frame']
-        if profiles[ndx_2]['intro_duration'] < 0:
-            profiles[ndx_2]['intro_duration'] = 0
 
         print_timestamp(profiles[ndx_2]['path'], profiles[ndx_2]['start_frame'], profiles[ndx_2]['end_frame'], profiles[ndx_2]['fps'], log_level, log_file)
 
@@ -463,13 +462,12 @@ def process_directory(file_paths=[], log_level=0, log_file=False, cleanup=True, 
     # apply pre-roll if wanted
     # use the fps and start/end frame values to calculate the timestamps for the intros and add them to the profiles
     for profile in profiles:
-        if profile['intro_duration'] < int(min_intro_length_sec * profile['fps']):
+        if intro_duration(profile) < int(min_intro_length_sec * profile['fps']):
             print_debug(a=['%s - intro is less than %s seconds - skipping' % (profile['path'], min_intro_length_sec)], log=log_level > 1, log_file=log_file)
             profile['start_frame'] = 0
             profile['end_frame'] = 0
-        elif preroll_seconds > 0 and profile['end_frame'] > profile['start_frame'] + int(profile['fps'] * preroll_seconds):
-            profile['end_frame'] -= int(profile['fps'] * preroll_seconds)
-            profile['intro_duration'] -= int(profile['fps'] * preroll_seconds)
+        elif preroll_seconds > 0 and profile['end_frame'] > profile['start_frame'] + floor(profile['fps'] * preroll_seconds):
+            profile['end_frame'] -= floor(profile['fps'] * preroll_seconds)
         get_timestamp_from_frame(profile)
         print_debug(a=[profile['path'] + " start time: " + profile['start_time'] + " end time: " + profile['end_time']], log=log_level > 1, log_file=log_file)
 
