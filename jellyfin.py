@@ -58,7 +58,7 @@ def get_path_map(log_level=0):
             map = m.strip().split('::')
             if len(map) != 2:
                 continue
-            path_map.append((Path(map[0]), Path(map[1])))
+            path_map.append((Path(map[0].replace('\\', '/')), Path(map[1].replace('\\', '/'))))
 
     if (config_path / 'path_map.txt').exists():
         with (config_path / 'path_map.txt').open('r') as file:
@@ -68,10 +68,10 @@ def get_path_map(log_level=0):
                 map = line.strip().split('::')
                 if len(map) != 2:
                     continue
-                path_map.append((Path(map[0]), Path(map[1])))
+                path_map.append((Path(map[0].replace('\\', '/')), Path(map[1].replace('\\', '/'))))
 
     if log_level > 1:
-        print_debug(a=['path maps: [%s]' % path_map], log=True)
+        print_debug(a=['path maps: %s' % path_map], log=True)
         for path in path_map:
             if Path(path[0]).exists() and Path(path[0]).is_dir():
                 print_debug(a=['top level contents of mapped path [%s]' % str(path[0])], log=True)

@@ -5,12 +5,13 @@ from pathlib import Path
 def map_path(path, path_map):
     new_path = path
 
+    repr_path = path.replace('\\', '/')
     for mapping in path_map:
         path_map_parts_list = list(Path(mapping[1]).parts)
-        jellyfin_path_parts_list = list(Path(path).parts)
+        jellyfin_path_parts_list = list(Path(repr_path).parts)
 
-        path_map_parts = set(map(str.lower, Path(mapping[1]).parts))
-        jellyfin_path_parts = set(map(str.lower, Path(path).parts))
+        path_map_parts = set(path_map_parts_list)
+        jellyfin_path_parts = set(jellyfin_path_parts_list)
 
         if path_map_parts.issubset(jellyfin_path_parts):
             new_path = str(Path(mapping[0]).joinpath(Path(*jellyfin_path_parts_list[len(path_map_parts_list):])))
