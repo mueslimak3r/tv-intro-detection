@@ -131,13 +131,13 @@ def check_season_valid(season=None, episodes=[], repair=False, debug=False):
             filtered_episodes.append(episode)
 
     if failed_to_find_files:
-        print_debug(a=['season [%s] of show [%s] - failed to access some of the media files' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
+        print_debug(a=['skipping season [%s] of show [%s] - failed to access some of the media files' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
         print_debug(a=['path for the first episode [%s]' % episodes[0]['Path']], log=debug, log_file=debug)
 
     if not filtered_episodes:
         return []
     if len(filtered_episodes) > maximum_episodes_per_season:
-        print_debug(a=['skipping season [%s] of show [%s] since it contains %s episodes (more than max %s)' % (season['Name'], season['SeriesName'], len(filtered_episodes), maximum_episodes_per_season)], log=debug, log_file=debug)
+        print_debug(a=['skipping season [%s] of show [%s] - it contains %s episodes (more than max %s)' % (season['Name'], season['SeriesName'], len(filtered_episodes), maximum_episodes_per_season)], log=debug, log_file=debug)
         return []
     
     duration_mins = int(filtered_episodes[0]['Duration'])
