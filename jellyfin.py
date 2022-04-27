@@ -249,7 +249,7 @@ def get_season_fingerprint(season=None, episodes=[], debug=False):
 
     if not fingerprint_list:
         print_debug(a=['trying to remake season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
-        season_fp_dict = remake_season_fingerprint(episodes, season_fp_dict, 2 if debug else 0, debug)
+        season_fp_dict = remake_season_fingerprint(episodes, season_fp_dict, debug)
         profile_modified = True
     else:
         print_debug(a=['found valid season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
