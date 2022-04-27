@@ -207,6 +207,7 @@ def remake_season_fingerprint(episodes=[], season_fingerprint=None, debug=False)
     if 'path' in profile:
         profile.pop('path', None)
     profile['fingerprint'] = None
+    profile['revision_id'] = revision_id
 
     fingerprint = create_video_fingerprint(profile, hash_fps, 2 if debug else 0, debug)
 
@@ -253,7 +254,7 @@ def get_season_fingerprint(season=None, episodes=[], debug=False):
     fingerprint_list = []
     if 'revision_id' in season_fp_dict and season_fp_dict['revision_id'] == revision_id \
             and 'fingerprint' in season_fp_dict and \
-                'hash_fps' in season_fp_dict and season_fp_dict['hash_fps'] == hash_fps:
+            'hash_fps' in season_fp_dict and season_fp_dict['hash_fps'] == hash_fps:
         fingerprint_list = read_fingerprint(season_fp_dict['fingerprint'], 2 if debug else 0, debug)
 
     profile_modified = False
@@ -264,7 +265,6 @@ def get_season_fingerprint(season=None, episodes=[], debug=False):
                                                                                                          season['Name'], season['SeriesName'])], log=debug, log_file=debug)
 
     if not fingerprint_list or abs(len(fingerprint_list) - floor(intro_duration(season_fp_dict) / (season_fp_dict['fps'] / hash_fps))) > 2:
-
         print_debug(a=['trying to remake season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
         season_fp_dict = remake_season_fingerprint(episodes, season_fp_dict, debug)
         profile_modified = True
