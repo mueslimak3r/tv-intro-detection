@@ -214,8 +214,8 @@ def save_season_fingerprint(fingerprints, profiles, ndx, filtered_lengths, short
     season_fingerprint = {}
     season_fingerprint.update(profiles[ndx])
 
-    tmp_start_frame = floor(profile[ndx]['start_frame'] / (profile[ndx]['fps'] / hash_fps)) if profile[ndx]['start_frame'] > 0 else 0
-    tmp_end_frame = floor(profile[ndx]['end_frame'] / (profile[ndx]['fps'] / hash_fps)) if profile[ndx]['end_frame'] > 0 else 0
+    tmp_start_frame = floor(profiles[ndx]['start_frame'] / (profiles[ndx]['fps'] / hash_fps)) if profiles[ndx]['start_frame'] > 0 else 0
+    tmp_end_frame = floor(profiles[ndx]['end_frame'] / (profiles[ndx]['fps'] / hash_fps)) if profiles[ndx]['end_frame'] > 0 else 0
 
     trimmed_fingerprint = fingerprints[ndx][tmp_start_frame:tmp_end_frame + 1]
 
@@ -453,8 +453,7 @@ def process_directory(profiles=[], ref_profile=None, hashfps=2, log_level=0, log
 
     hashing_start = datetime.now()
     for p in profiles:
-        file_path = p['Path']
-        fingerprint = get_or_create_fingerprint(file_path, log_level, log_file)
+        fingerprint = get_or_create_fingerprint(p, log_level, log_file)
         if fingerprint:
             fingerprints.append(fingerprint)
     hashing_end = datetime.now()
