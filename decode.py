@@ -367,7 +367,6 @@ def correct_errors(fingerprints, profiles, save_sf=True, log_level=0, log_file=F
         guessed_start_diff = abs(profiles[nprofile]['end_frame'] - guessed_start - average)
         if intro_duration(profiles[nprofile]) in new_filtered_lengths and \
                 diff_from_avg < int(15 * profiles[nprofile]['fps']):
-
             if nprofile in non_conforming_profiles:
                 repaired += 1
                 print_debug(a=['\nreprocess successful for file [%s] new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
@@ -378,13 +377,12 @@ def correct_errors(fingerprints, profiles, save_sf=True, log_level=0, log_file=F
                 profiles[nprofile]['start_frame'] = guessed_start
                 print_debug(a=['\nreprocess successful by guessing start for file [%s] - new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
                 print_timestamp(profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
-        else:
-            if nprofile in non_conforming_profiles:
-                print_debug(a=['\nfailed to locate intro by reprocessing %s' % profiles[nprofile]['Path']], log_file=log_file)
-                print_debug(a=['file [%s] new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
-                print_timestamp(profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
-                profiles[nprofile]['start_frame'] = 0
-                profiles[nprofile]['end_frame'] = 0
+        elif nprofile in non_conforming_profiles:
+            print_debug(a=['\nfailed to locate intro by reprocessing %s' % profiles[nprofile]['Path']], log_file=log_file)
+            print_debug(a=['file [%s] new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
+            print_timestamp(profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
+            profiles[nprofile]['start_frame'] = 0
+            profiles[nprofile]['end_frame'] = 0
     print_debug(a=['\nrepaired %s/%s non conforming profiles\n' % (repaired, len(non_conforming_profiles))], log=log_level > 0, log_file=log_file)
 
 
