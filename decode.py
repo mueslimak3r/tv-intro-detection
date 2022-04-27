@@ -340,7 +340,7 @@ def correct_errors(fingerprints, profiles, ref_profile, log_level=0, log_file=Fa
         print_debug(a=['reprocessing %s by comparing to %s' % (profiles[nprofile]['Path'], profiles[ref_profile_ndx]['Path'])], log=log_level > 0, log_file=log_file)
         tmp_profile = {}
         tmp_profile.update(profiles[ref_profile_ndx])
-        tmp_index = len(fingerprints) - 1
+        tmp_index = len(fingerprints)
 
         if ref_profile is None or profiles[ref_profile_ndx]['Path'] == ref_profile['Path']:
             tmp_start_frame = floor(profiles[ref_profile_ndx]['start_frame'] / (profiles[ref_profile_ndx]['fps'] / hash_fps)) if profiles[ref_profile_ndx]['start_frame'] > 0 else 0
