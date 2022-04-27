@@ -35,6 +35,8 @@ session_timestamp = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
 
 hash_fps = 2
 
+revision_id = 2.0
+
 
 def print_debug(a=[], log=True, log_file=False):
     # Here a is the array holding the objects
@@ -212,8 +214,8 @@ def remake_season_fingerprint(episodes=[], season_fingerprint=None, debug=False)
         print_debug(a=['failed to create new fingerprint'], log=debug, log_file=debug)
         return None
     
-    tmp_start_frame = floor(profile['start_frame'] / (profile['fps'] / hash_fps)) if profile['start_frame'] > 0 else 0
-    tmp_end_frame = floor(profile['end_frame'] / (profile['fps'] / hash_fps)) if profile['end_frame'] > 0 else 0
+    tmp_start_frame = floor((profile['start_frame'] / profile['fps']) * hash_fps) if profile['start_frame'] > 0 else 0
+    tmp_end_frame = floor((profile['end_frame'] / profile['fps']) * hash_fps) if profile['end_frame'] > 0 else 0
 
     try:
         trimmed_fingerprint = fingerprint[tmp_start_frame:tmp_end_frame + 1]
@@ -249,7 +251,9 @@ def get_season_fingerprint(season=None, episodes=[], debug=False):
         return None
     
     fingerprint_list = []
-    if 'fingerprint' in season_fp_dict and 'hash_fps' in season_fp_dict and season_fp_dict['hash_fps'] == hash_fps:
+    if 'revision_id' in season_fp_dict and season_fp_dict['revision_id'] == revision_id \
+            and 'fingerprint' in season_fp_dict and \
+                'hash_fps' in season_fp_dict and season_fp_dict['hash_fps'] == hash_fps:
         fingerprint_list = read_fingerprint(season_fp_dict['fingerprint'], 2 if debug else 0, debug)
 
     profile_modified = False

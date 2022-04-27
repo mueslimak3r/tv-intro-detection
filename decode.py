@@ -36,6 +36,8 @@ hash_fps = 2
 
 session_timestamp = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
 
+revision_id = 2.0
+
 
 def print_debug(a=[], log=True, log_file=False):
     # Here a is the array holding the objects
@@ -136,7 +138,7 @@ def get_start_end(print1, print1_fps, print2, print2_fps, log_level):
 
     if highest_equal_frames:
         if swap:
-            return (floor(highest_equal_frames[0][1] * (print2_fps / hash_fps)), floor(highest_equal_frames[-1][1] * (print2_fps / hash_fps))), (floor(highest_equal_frames[0][0] * (print1_fps / hash_fps)), floor(highest_equal_frames[-1][0] * (print1_fps / hash_fps)))
+            return (floor(highest_equal_frames[0][1] * (print1_fps / hash_fps)), floor(highest_equal_frames[-1][1] * (print1_fps / hash_fps))), (floor(highest_equal_frames[0][0] * (print2_fps / hash_fps)), floor(highest_equal_frames[-1][0] * (print2_fps / hash_fps)))
         else:
             return (floor(highest_equal_frames[0][0] * (print1_fps / hash_fps)), floor(highest_equal_frames[-1][0] * (print1_fps / hash_fps))), (floor(highest_equal_frames[0][1] * (print2_fps / hash_fps)), floor(highest_equal_frames[-1][1] * (print2_fps / hash_fps)))
     else:
@@ -216,8 +218,8 @@ def save_season_fingerprint(fingerprints, profiles, ndx, filtered_lengths, short
     season_fingerprint = {}
     season_fingerprint.update(profiles[ndx])
 
-    tmp_start_frame = floor(profiles[ndx]['start_frame'] / (profiles[ndx]['fps'] / hash_fps)) if profiles[ndx]['start_frame'] > 0 else 0
-    tmp_end_frame = floor(profiles[ndx]['end_frame'] / (profiles[ndx]['fps'] / hash_fps)) if profiles[ndx]['end_frame'] > 0 else 0
+    tmp_start_frame = floor((profiles[ndx]['start_frame'] / profiles[ndx]['fps']) * hash_fps) if profiles[ndx]['start_frame'] > 0 else 0
+    tmp_end_frame = floor((profiles[ndx]['end_frame'] / profiles[ndx]['fps']) * hash_fps) if profiles[ndx]['end_frame'] > 0 else 0
 
     trimmed_fingerprint = fingerprints[ndx][tmp_start_frame:tmp_end_frame + 1]
 
@@ -230,6 +232,7 @@ def save_season_fingerprint(fingerprints, profiles, ndx, filtered_lengths, short
     season_fingerprint['average_frames'] = average
     season_fingerprint['average_sample_size'] = len(filtered_lengths)
     season_fingerprint['hash_fps'] = hash_fps
+    season_fingerprint['revision_id'] = revision_id
 
     path = Path(data_path / 'fingerprints' / (name + '.json'))
     Path(data_path / 'fingerprints').mkdir(parents=True, exist_ok=True)
@@ -343,8 +346,8 @@ def correct_errors(fingerprints, profiles, ref_profile, log_level=0, log_file=Fa
         tmp_index = len(fingerprints)
 
         if ref_profile is None or profiles[ref_profile_ndx]['Path'] == ref_profile['Path']:
-            tmp_start_frame = floor(profiles[ref_profile_ndx]['start_frame'] / (profiles[ref_profile_ndx]['fps'] / hash_fps)) if profiles[ref_profile_ndx]['start_frame'] > 0 else 0
-            tmp_end_frame = floor(profiles[ref_profile_ndx]['end_frame'] / (profiles[ref_profile_ndx]['fps'] / hash_fps)) if profiles[ref_profile_ndx]['end_frame'] > 0 else 0
+            tmp_start_frame = floor((profiles[ref_profile_ndx]['start_frame'] / profiles[ref_profile_ndx]['fps']) * hash_fps) if profiles[ref_profile_ndx]['start_frame'] > 0 else 0
+            tmp_end_frame = floor((profiles[ref_profile_ndx]['end_frame'] / profiles[ref_profile_ndx]['fps']) * hash_fps) if profiles[ref_profile_ndx]['end_frame'] > 0 else 0
             fingerprints.append(fingerprints[ref_profile_ndx][tmp_start_frame:tmp_end_frame + 1])
         else:
             fingerprints.append(fingerprints[ref_profile_ndx])
