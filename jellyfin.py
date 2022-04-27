@@ -245,14 +245,18 @@ def get_season_fingerprint(season=None, episodes=[], debug=False):
     if 'fingerprint' in season_fp_dict and 'hash_fps' in season_fp_dict and season_fp_dict['hash_fps'] == hash_fps:
         fingerprint_list = read_fingerprint(season_fp_dict['fingerprint'], 2 if debug else 0, debug)
 
+    profile_modified = False
+
     if not fingerprint_list:
         print_debug(a=['trying to remake season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
         season_fp_dict = remake_season_fingerprint(episodes, season_fp_dict, 2 if debug else 0, debug)
-        if season_fp_dict is not None:
-            with path.open('w+') as json_file:
-                json.dump(season_fp_dict, json_file, indent=4)
+        profile_modified = True
     else:
         print_debug(a=['found valid season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
+
+    if profile_modified and season_fp_dict is not None:
+        with path.open('w+') as json_file:
+            json.dump(season_fp_dict, json_file, indent=4)
     return season_fp_dict
 
 
