@@ -2,6 +2,7 @@ import os
 import re
 import sys
 import getopt
+
 import jellyfin_queries
 import json
 import shutil
@@ -9,10 +10,11 @@ import hashlib
 
 
 from time import sleep
+from math import floor
 from pathlib import Path
 from datetime import datetime
 from jellyfin_api_client import jellyfin_login, jellyfin_logout
-from decode import process_directory
+from decode import process_directory, read_fingerprint, create_video_fingerprint
 
 server_url = os.environ['JELLYFIN_URL'] if 'JELLYFIN_URL' in os.environ else ''
 server_username = os.environ['JELLYFIN_USERNAME'] if 'JELLYFIN_USERNAME' in os.environ else ''
@@ -30,6 +32,8 @@ maximum_episodes_per_season = 30  # meant to skip daily shows like jeopardy
 sleep_after_finish_sec = 300  # sleep for 5 minutes after the script finishes. If it runs automatically this prevents it rapidly looping
 
 session_timestamp = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
+
+hash_fps = 2
 
 
 def print_debug(a=[], log=True, log_file=False):
@@ -143,7 +147,7 @@ def check_season_valid(season=None, episodes=[], repair=False, log_level=0, log_
         print_debug(a=['skipping season [%s] of show [%s] - episodes are too short (%s minutes) (less than minimum %s minutes)' % (season['Name'], season['SeriesName'], duration_mins, minimum_episode_duration)], log=log_level > 1)
         return []
     
-    season_hash_exists = 1 if Path(path / 'season.json').exists() else 0
+    season_hash_exists = 1 if season['SeasonFingerprint'] is not None else 0
     if len(filtered_episodes) + season_hash_exists < 2:
         print_debug(a=['skipping season [%s] of show [%s] - it doesn\'t contain at least 2 episodes' % (season['Name'], season['SeriesName'])], log=log_level > 1)
         return []
@@ -161,6 +165,96 @@ def get_file_paths(season=None):
     for episode in season['Episodes']:
         file_paths.append(episode['Path'])
     return file_paths
+
+
+def check_if_in_list_of_dict(dict_list, value):
+    if dict_list is None:
+        return -1
+
+    for ndx in range(0, len(dict_list)):
+        if value in dict_list[ndx].values():
+            return ndx
+    return -1
+
+
+def remake_season_fingerprint(episodes=[], season_fingerprint=None, log_level=0, log_file=False):
+    if not episodes:
+        return ''
+
+    ndx = -1
+    if 'EpisodeId' in season_fingerprint:
+        ep_id = season_fingerprint['EpisodeId']
+        ndx = check_if_in_list_of_dict(episodes, ep_id)
+
+    if ndx == -1 and 'Name' in season_fingerprint:
+        ndx = check_if_in_list_of_dict(episodes, season_fingerprint['Name'])
+    
+    if ndx == -1:
+        trimmed_path = season_fingerprint['Path' if 'Path' in season_fingerprint else 'path'].split('/')[-1]
+        for i in range(0, len(episodes)):
+            if trimmed_path in str(episodes[i]['Path']):
+                ndx = i
+                break
+
+    if ndx == -1:
+        print_debug(a=['failed to match season fingerprint to episode in jellyfin'], log=log_level > 1, log_file=log_file)
+        return ''
+
+    profile = season_fingerprint
+    profile.update(episodes[ndx])
+    if 'path' in profile:
+        profile.pop('path', None)
+    profile['fingerprint'] = None
+
+    fingerprint = create_video_fingerprint(profile, log_level, log_file)
+
+    if not fingerprint:
+        print_debug(a=['failed to create new fingerprint'], log=log_level > 1, log_file=log_file)
+        return ''
+    
+    tmp_start_frame = floor(profile['start_frame'] / (profile['fps'] / hash_fps)) if profile['start_frame'] > 0 else 0
+    tmp_end_frame = floor(profile['end_frame'] / (profile['fps'] / hash_fps)) if profile['end_frame'] > 0 else 0
+
+    try:
+        trimmed_fingerprint = fingerprint[tmp_start_frame:tmp_end_frame + 1]
+        fingerprint_str = ''
+        for f in trimmed_fingerprint:
+            fingerprint_str += str(f)
+        return fingerprint_str
+    except BaseException as err:
+        print_debug(a=['failed to trim new fingerprint'], log=log_level > 1, log_file=log_file)
+    return ''
+
+
+def get_season_fingerprint(season=None, episodes=[], log_level=0, log_file=False):
+    if season is None:
+        return
+    
+    season_fp_dict = None
+    path = Path(data_path / 'jellyfin_cache' / str(season['SeriesId']) / str(season['SeasonId']) / ('season' + '.json'))
+    if path.exists():
+        with path.open('r') as json_file:
+            season_fp_dict = json.load(json_file)
+
+    if season_fp_dict is None:
+        return
+    
+    # print(season_fp_dict)
+    
+    fingerprint_list = []
+    if 'fingerprint' in season_fp_dict:
+        fingerprint_list = read_fingerprint(season_fp_dict['fingerprint'], log_level, log_file)
+
+    if not fingerprint_list:
+        print_debug(a=['trying to remake season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=log_level > 1, log_file=log_file)
+        new_fingerprint = remake_season_fingerprint(episodes, season_fp_dict, log_level, log_file)
+        if new_fingerprint != '':
+            season_fp_dict['fingerprint'] = new_fingerprint
+            with path.open('w+') as json_file:
+                json.dump(season_fp_dict, json_file, indent=4)
+    else:
+        print_debug(a=['found valid season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=log_level > 1, log_file=log_file)
+    return season_fp_dict
 
 
 def get_jellyfin_shows(reverse_sort=False, repair=False, log_level=0, log_file=False):
@@ -214,6 +308,8 @@ def get_jellyfin_shows(reverse_sort=False, repair=False, log_level=0, log_file=F
             if not episodes:
                 continue
 
+            season['SeasonFingerprint'] = get_season_fingerprint(season=season, episodes=episodes, log_level=log_level, log_file=log_file)
+
             season['Episodes'] = check_season_valid(season, episodes, repair, log_level, log_file)
             if season['Episodes']:
                 episode_count += len(season['Episodes'])
@@ -232,25 +328,13 @@ def get_jellyfin_shows(reverse_sort=False, repair=False, log_level=0, log_file=F
     return shows
 
 
-def get_season_fingerprint(season=None, debug=False, log_file=False):
-    if season is None:
-        return
-    
-    season_fingerprint = None
-    path = Path(data_path / 'jellyfin_cache' / str(season['SeriesId']) / str(season['SeasonId']) / ('season' + '.json'))
-    if path.exists():
-        with path.open('r') as json_file:
-            season_fingerprint = json.load(json_file)
-    return season_fingerprint
-
-
 def copy_season_fingerprint(result: list = [], dir_path: Path = None, debug: bool = False, log_file: bool = False):
     if not result or dir_path is None:
         return
 
     name = ''
     for profile in result:
-        name += replace(profile['path'])
+        name += replace(profile['Path'])
     hash_object = hashlib.md5(name.encode())
     name = hash_object.hexdigest()
 
@@ -275,9 +359,8 @@ def save_season(season=None, result=None, save_json=False, debug=False, log_file
             if debug:
                 print_debug(a=['episode index past bounds of result'], log_file=log_file)
             break
-        if season['Episodes'][ndx]['Path'] == result[ndx]['path']:
+        if season['Episodes'][ndx]['Path'] == result[ndx]['Path']:
             season['Episodes'][ndx].update(result[ndx])
-            season['Episodes'][ndx].pop('path', None)
             print(season['Episodes'][ndx])
             season['Episodes'][ndx]['created'] = str(datetime.now())
             if save_json:
@@ -320,7 +403,7 @@ def process_jellyfin_shows(log_level=0, log_file=False, save_json=False, reverse
 
             if file_paths:
                 print_debug(a=['%s/%s - %s - %s episodes' % (season_ndx, len(show['Seasons']), season['Name'], len(season['Episodes']))], log_file=log_file)
-                result = process_directory(file_paths=file_paths, ref_profile=get_season_fingerprint(season=season, debug=log_level > 0, log_file=log_file),
+                result = process_directory(profiles=season['Episodes'], ref_profile=season['SeasonFingerprint'], hashfps=hash_fps,
                                            cleanup=False, log_level=log_level, log_file=log_file, log_timestamp=session_timestamp)
                 if result:
                     save_season(season, result, save_json, log_level > 0, log_file)

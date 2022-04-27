@@ -87,7 +87,7 @@ def create_video_fingerprint(profile, log_level, log_file):
     video_fingerprint = []
 
     quarter_frames_or_first_X_mins = min(floor(((profile['total_frames'] / profile['fps']) / 4) * hash_fps), floor(max_fingerprint_mins * 60 * hash_fps))
-    video_fingerprint = get_fingerprint_ffmpeg(profile['path'], hash_fps, quarter_frames_or_first_X_mins, log_level, log_file, session_timestamp, True)
+    video_fingerprint = get_fingerprint_ffmpeg(profile['Path'], hash_fps, quarter_frames_or_first_X_mins, log_level, log_file, session_timestamp, True)
 
     return video_fingerprint
 
@@ -142,34 +142,51 @@ def get_start_end(print1, print1_fps, print2, print2_fps, log_level):
         return (0, 0), (0, 0)
 
 
-def get_or_create_fingerprint(file, log_level, log_file):
+def read_fingerprint(fingerprint_str, log_level, log_file):
+    fingerprint = []
+    if fingerprint_str != '' and len(fingerprint_str) % 16 == 0:
+        try:
+            for ndx in range(0, floor(len(fingerprint_str) / 16)):
+                fingerprint.append(imagehash.hex_to_hash(fingerprint_str[ndx * 16:ndx * 16 + 16]))
+            print_debug(a=['fingerprint looks valid'], log=log_level > 1, log_file=log_file)
+        except BaseException as err:
+            print_debug(a=['error reading season fingerprint'], log=log_level > 0, log_file=log_file)
+            fingerprint = []
+    return fingerprint
+
+
+def read_fingerprint_file(file, log_level, log_file):
+    if not Path(file).exists():
+        return []
+
+    fingerprint = []
+    print_debug(a=['loading existing fingerprint for [%s]' % file], log=log_level > 1, log_file=log_file)
+    with Path(data_path / 'fingerprints' / replace(file) / 'fingerprint.txt').open('r') as text_file:
+        fingerprint_str = text_file.read()
+        read_fingerprint(fingerprint_str, log_level, log_file)
+    return fingerprint
+
+
+def get_or_create_fingerprint(profile, log_level, log_file):
     start = datetime.now()
-    video = cv2.VideoCapture(file)
+    video = cv2.VideoCapture(profile['Path'])
     fps = video.get(cv2.CAP_PROP_FPS)
 
-    profile = {}
     profile['fps'] = fps
-    profile['path'] = file
     profile['total_frames'] = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
     video.release()
 
     fingerprint = []
 
-    if Path(data_path / 'fingerprints' / replace(file) / 'fingerprint.txt').exists():
-        print_debug(a=['loading existing fingerprint for [%s]' % file], log=log_level > 1, log_file=log_file)
-        with Path(data_path / 'fingerprints' / replace(file) / 'fingerprint.txt').open('r') as text_file:
-            fingerprint_str = text_file.read()
-            if fingerprint_str != '' and len(fingerprint_str) % 16 == 0:
-                print_debug(a=['fingerprint looks valid'], log=log_level > 1, log_file=log_file)
-                for ndx in range(0, floor(len(fingerprint_str) / 16)):
-                    fingerprint.append(imagehash.hex_to_hash(fingerprint_str[ndx * 16:ndx * 16 + 16]))
+    if Path(data_path / 'fingerprints' / replace(profile['Path']) / 'fingerprint.txt').exists():
+        fingerprint = read_fingerprint_file(Path(data_path / 'fingerprints' / replace(profile['Path']) / 'fingerprint.txt'), log_level, log_file)
     else:
-        print_debug(a=['creating new fingerprint for [%s]' % file], log=log_level > 1, log_file=log_file)
+        print_debug(a=['creating new fingerprint for [%s]' % profile['Path']], log=log_level > 1, log_file=log_file)
         fingerprint = create_video_fingerprint(profile, log_level, log_file)
 
     end = datetime.now()
-    print_debug(a=["processed fingerprint in %s for [%s]" % (str(end - start), file)], log=log_level > 0, log_file=log_file)
-    return fingerprint, profile
+    print_debug(a=["processed fingerprint in %s for [%s]" % (str(end - start), profile['Path'])], log=log_level > 0, log_file=log_file)
+    return fingerprint
 
 
 def check_files_exist(file_paths=[]):
@@ -190,13 +207,23 @@ def save_season_fingerprint(fingerprints, profiles, ndx, filtered_lengths, short
 
     name = ''
     for profile in profiles:
-        name += replace(profile['path'])
+        name += replace(profile['Path'])
     hash_object = hashlib.md5(name.encode())
     name = hash_object.hexdigest()
 
     season_fingerprint = {}
     season_fingerprint.update(profiles[ndx])
-    season_fingerprint['fingerprint'] = str(fingerprints[ndx])
+
+    tmp_start_frame = floor(profile[ndx]['start_frame'] / (profile[ndx]['fps'] / hash_fps)) if profile[ndx]['start_frame'] > 0 else 0
+    tmp_end_frame = floor(profile[ndx]['end_frame'] / (profile[ndx]['fps'] / hash_fps)) if profile[ndx]['end_frame'] > 0 else 0
+
+    trimmed_fingerprint = fingerprints[ndx][tmp_start_frame:tmp_end_frame + 1]
+
+    fingerprint_str = ''
+    for f in trimmed_fingerprint:
+        fingerprint_str += str(f)
+
+    season_fingerprint['fingerprint'] = fingerprint_str
     season_fingerprint['reference_duration'] = shortest_duration
     season_fingerprint['average_frames'] = average
     season_fingerprint['average_sample_size'] = len(filtered_lengths)
@@ -230,7 +257,7 @@ def sort_conforming_profile(profile_tuple):
     return profile_tuple[1]
 
 
-def correct_errors(fingerprints, profiles, log_level, log_file=False):
+def correct_errors(fingerprints, profiles, save_sf=True, log_level=0, log_file=False):
 
     # build a list of intro lengths with outliers rejected
     lengths = []
@@ -240,8 +267,8 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
 
             lengths.append(intro_duration(profile))
         else:
-            print_debug(a=['excluding profile from pool of durations due to it being to long or short %s start %s end %s' % (profile['path'], profile['start_frame'], profile['end_frame'])], log=log_level > 1, log_file=log_file)
-            print_timestamp(profile['path'], profile['start_frame'], profile['end_frame'], profile['fps'], log_level, log_file)
+            print_debug(a=['excluding profile from pool of durations due to it being to long or short %s start %s end %s' % (profile['Path'], profile['start_frame'], profile['end_frame'])], log=log_level > 1, log_file=log_file)
+            print_timestamp(profile['Path'], profile['start_frame'], profile['end_frame'], profile['fps'], log_level, log_file)
     filtered_lengths = reject_outliers(lengths)
 
     if len(filtered_lengths) < 1:
@@ -273,13 +300,13 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
     non_conforming_profiles = []
     for ndx in range(0, len(profiles)):
         diff_from_avg = abs(intro_duration(profiles[ndx]) - average)
-        print_debug(a=['file [%s] diff from average %s' % (profiles[ndx]['path'], diff_from_avg)], log=log_level > 1, log_file=log_file)
+        print_debug(a=['file [%s] diff from average %s' % (profiles[ndx]['Path'], diff_from_avg)], log=log_level > 1, log_file=log_file)
         if intro_duration(profiles[ndx]) in filtered_lengths or \
                 diff_from_avg < int(15 * profiles[ndx]['fps']):
             conforming_profiles.append((ndx, intro_duration(profiles[ndx])))
         else:
-            print_debug(a=['\nrejected file [%s] with start %s end %s' % (profiles[ndx]['path'], profiles[ndx]['start_frame'], profiles[ndx]['end_frame'])], log_file=log_file)
-            print_timestamp(profiles[ndx]['path'], profiles[ndx]['start_frame'], profiles[ndx]['end_frame'], profiles[ndx]['fps'], log_level, log_file)
+            print_debug(a=['\nrejected file [%s] with start %s end %s' % (profiles[ndx]['Path'], profiles[ndx]['start_frame'], profiles[ndx]['end_frame'])], log_file=log_file)
+            print_timestamp(profiles[ndx]['Path'], profiles[ndx]['start_frame'], profiles[ndx]['end_frame'], profiles[ndx]['fps'], log_level, log_file)
             non_conforming_profiles.append(ndx)
 
     print_debug(a=['\nrejected start frame values from %s of %s results\n' % (len(non_conforming_profiles), len(profiles))], log=log_level > 0, log_file=log_file)
@@ -295,10 +322,11 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
     # this profile will be the reference profile used when repairing the rejected profiles
     conforming_profiles.sort(key=sort_conforming_profile)
     shortest_duration = intro_duration(profiles[conforming_profiles[0][0]])
-    print_debug(a=['shortest duration %s from %s' % (shortest_duration, profiles[conforming_profiles[0][0]]['path'])], log=log_level > 0, log_file=log_file)
+    print_debug(a=['shortest duration %s from %s' % (shortest_duration, profiles[conforming_profiles[0][0]]['Path'])], log=log_level > 0, log_file=log_file)
     ref_profile_ndx = conforming_profiles[int(floor(len(conforming_profiles) / 2))][0]
 
-    save_season_fingerprint(fingerprints, profiles, ref_profile_ndx, filtered_lengths, shortest_duration)
+    if save_season_fingerprint:
+        save_season_fingerprint(fingerprints, profiles, ref_profile_ndx, filtered_lengths, shortest_duration)
 
     if len(non_conforming_profiles) < 1:
         print_debug(a=['no profiles were rejected!'], log=log_level > 0, log_file=log_file)
@@ -306,18 +334,18 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
 
     # reprocess the rejected profiles by comparing them to the reference profile
     for nprofile in non_conforming_profiles:
-        print_debug(a=['reprocessing %s by comparing to %s' % (profiles[nprofile]['path'], profiles[ref_profile_ndx]['path'])], log=log_level > 0, log_file=log_file)
+        print_debug(a=['reprocessing %s by comparing to %s' % (profiles[nprofile]['Path'], profiles[ref_profile_ndx]['Path'])], log=log_level > 0, log_file=log_file)
         tmp_profile = {}
         tmp_profile.update(profiles[ref_profile_ndx])
 
-        tmp_start_frame = floor(profiles[ref_profile_ndx]['start_frame'] / (profiles[ref_profile_ndx]['fps'] / hash_fps))
-        tmp_end_frame = floor(profiles[ref_profile_ndx]['end_frame'] / (profiles[ref_profile_ndx]['fps'] / hash_fps))
+        tmp_start_frame = floor(profiles[ref_profile_ndx]['start_frame'] / (profiles[ref_profile_ndx]['fps'] / hash_fps)) if profiles[ref_profile_ndx]['start_frame'] > 0 else 0
+        tmp_end_frame = floor(profiles[ref_profile_ndx]['end_frame'] / (profiles[ref_profile_ndx]['fps'] / hash_fps)) if profiles[ref_profile_ndx]['end_frame'] > 0 else 0
 
         fingerprints.append(fingerprints[ref_profile_ndx][tmp_start_frame:tmp_end_frame + 1])
         profiles.append(tmp_profile)
         tmp_index = len(fingerprints) - 1
 
-        print_timestamp(profiles[tmp_index]['path'], profiles[tmp_index]['start_frame'], profiles[tmp_index]['end_frame'], profiles[tmp_index]['fps'], log_level, log_file)
+        print_timestamp(profiles[tmp_index]['Path'], profiles[tmp_index]['start_frame'], profiles[tmp_index]['end_frame'], profiles[tmp_index]['fps'], log_level, log_file)
 
         process_pairs(fingerprints, profiles, tmp_index, nprofile, SECOND, log_level, log_file)
         profiles.pop()
@@ -342,19 +370,19 @@ def correct_errors(fingerprints, profiles, log_level, log_file=False):
 
             if nprofile in non_conforming_profiles:
                 repaired += 1
-                print_debug(a=['\nreprocess successful for file [%s] new start %s end %s' % (profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
-                print_timestamp(profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
+                print_debug(a=['\nreprocess successful for file [%s] new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
+                print_timestamp(profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
         elif guessed_start_diff < int(15 * profiles[nprofile]['fps']):
             if nprofile in non_conforming_profiles:
                 repaired += 1
                 profiles[nprofile]['start_frame'] = guessed_start
-                print_debug(a=['\nreprocess successful by guessing start for file [%s] - new start %s end %s' % (profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
-                print_timestamp(profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
+                print_debug(a=['\nreprocess successful by guessing start for file [%s] - new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
+                print_timestamp(profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
         else:
             if nprofile in non_conforming_profiles:
-                print_debug(a=['\nfailed to locate intro by reprocessing %s' % profiles[nprofile]['path']], log_file=log_file)
-                print_debug(a=['file [%s] new start %s end %s' % (profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
-                print_timestamp(profiles[nprofile]['path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
+                print_debug(a=['\nfailed to locate intro by reprocessing %s' % profiles[nprofile]['Path']], log_file=log_file)
+                print_debug(a=['file [%s] new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
+                print_timestamp(profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
                 profiles[nprofile]['start_frame'] = 0
                 profiles[nprofile]['end_frame'] = 0
     print_debug(a=['\nrepaired %s/%s non conforming profiles\n' % (repaired, len(non_conforming_profiles))], log=log_level > 0, log_file=log_file)
@@ -367,32 +395,35 @@ def process_pairs(fingerprints, profiles, ndx_1, ndx_2, mode, log_level, log_fil
     if mode == BOTH or mode == FIRST:
         profiles[ndx_1]['start_frame'] = start_end[0][0]
         if profiles[ndx_1]['start_frame'] < 0:
-            print_debug(a=["start frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_1]['start_frame'], profiles[ndx_1]['path'])], log=log_level > 1)
+            print_debug(a=["start frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_1]['start_frame'], profiles[ndx_1]['Path'])], log=log_level > 1)
             profiles[ndx_1]['start_frame'] = 0
 
         profiles[ndx_1]['end_frame'] = start_end[0][1]
         if profiles[ndx_1]['end_frame'] < 0:
-            print_debug(a=["end frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_1]['end_frame'], profiles[ndx_1]['path'])], log=log_level > 1)
+            print_debug(a=["end frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_1]['end_frame'], profiles[ndx_1]['Path'])], log=log_level > 1)
             profiles[ndx_1]['end_frame'] = 0
 
-        print_timestamp(profiles[ndx_1]['path'], profiles[ndx_1]['start_frame'], profiles[ndx_1]['end_frame'], profiles[ndx_1]['fps'], log_level, log_file)
+        print_timestamp(profiles[ndx_1]['Path'], profiles[ndx_1]['start_frame'], profiles[ndx_1]['end_frame'], profiles[ndx_1]['fps'], log_level, log_file)
 
     if mode == BOTH or mode == SECOND:
         profiles[ndx_2]['start_frame'] = start_end[1][0]
         if profiles[ndx_2]['start_frame'] < 0:
-            print_debug(a=["start frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_2]['start_frame'], profiles[ndx_2]['path'])], log=log_level > 1)
+            print_debug(a=["start frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_2]['start_frame'], profiles[ndx_2]['Path'])], log=log_level > 1)
             profiles[ndx_2]['start_frame'] = 0
 
         profiles[ndx_2]['end_frame'] = start_end[1][1]
         if profiles[ndx_2]['end_frame'] < 0:
-            print_debug(a=["end frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_2]['end_frame'], profiles[ndx_2]['path'])], log=log_level > 1)
+            print_debug(a=["end frame is negative (%s), setting to 0 for [%s]" % (profiles[ndx_2]['end_frame'], profiles[ndx_2]['Path'])], log=log_level > 1)
             profiles[ndx_2]['end_frame'] = 0
 
-        print_timestamp(profiles[ndx_2]['path'], profiles[ndx_2]['start_frame'], profiles[ndx_2]['end_frame'], profiles[ndx_2]['fps'], log_level, log_file)
+        print_timestamp(profiles[ndx_2]['Path'], profiles[ndx_2]['start_frame'], profiles[ndx_2]['end_frame'], profiles[ndx_2]['fps'], log_level, log_file)
 
 
-def process_directory(file_paths=[], ref_profile=None, log_level=0, log_file=False, cleanup=True, log_timestamp=None):
+def process_directory(profiles=[], ref_profile=None, hashfps=2, log_level=0, log_file=False, cleanup=True, log_timestamp=None):
     global session_timestamp
+    global hash_fps
+
+    hash_fps = hashfps
 
     if log_timestamp is not None:
         session_timestamp = log_timestamp
@@ -403,15 +434,15 @@ def process_directory(file_paths=[], ref_profile=None, log_level=0, log_file=Fal
     if cleanup:
         print_debug(a=['fingerprint files will be cleaned up'], log=log_level > 0, log_file=log_file)
 
-    if not check_files_exist(file_paths):
+    if not check_files_exist(profiles):
         print_debug(a=['input files invalid or cannot be accessed'], log=log_level > 0, log_file=log_file)
         return {}
     
-    if len(file_paths) < 2:
+    if len(profiles) < 2:
         print_debug(a=['file list size is less than 2 - skipping'], log=log_level > 0, log_file=log_file)
         return {}
     
-    print_debug(a=['processing %s files' % len(file_paths)], log=log_level > 0, log_file=log_file)
+    print_debug(a=['processing %s files' % len(profiles)], log=log_level > 0, log_file=log_file)
     
     if cleanup and Path(data_path / 'fingerprints').is_dir():
         try:
@@ -423,31 +454,28 @@ def process_directory(file_paths=[], ref_profile=None, log_level=0, log_file=Fal
     fingerprints = []  # list of hash values
 
     hashing_start = datetime.now()
-    for file_path in file_paths:
-        fingerprint, profile = get_or_create_fingerprint(file_path, log_level, log_file)
+    for p in profiles:
+        file_path = p['Path']
+        fingerprint = get_or_create_fingerprint(file_path, log_level, log_file)
         if fingerprint:
             fingerprints.append(fingerprint)
-        profiles.append(profile)
     hashing_end = datetime.now()
     print_debug(a=["got or created fingerprints in %s" % str(hashing_end - hashing_start)], log=log_level > 0, log_file=log_file)
+
+    if ref_profile is not None and 'hash_fps' in ref_profile and ref_profile['hash_fps'] == hash_fps:
+        fingerprint = read_fingerprint(ref_profile['fingerprint'], log_level, log_file)
+        if fingerprint:
+            fingerprints.insert(0, fingerprint)
+            ref_profile.pop('fingerprint', None)
+            profiles.insert(0, ref_profile)
+        else:
+            ref_profile = None
+    else:
+        ref_profile = None
 
     if (ref_profile is not None and len(fingerprints) < 1) or (ref_profile is None and len(fingerprints) < 2):
         print_debug(a=['fewer than 2 valid fingerprints were found - skipping'], log=log_level > 0, log_file=log_file)
         return {}
-
-    if ref_profile is not None and 'hash_fps' in ref_profile and ref_profile['hash_fps'] != hash_fps:
-        ref_profile = None
-
-    if ref_profile is not None:
-        fingerprint_str = ref_profile['fingerprint']
-        fingerprint = []
-        if fingerprint_str != '' and len(fingerprint_str) % 16 == 0:
-            print_debug(a=['fingerprint looks valid'], log=log_level > 1, log_file=log_file)
-            for ndx in range(0, floor(len(fingerprint_str) / 16)):
-                fingerprint.append(imagehash.hex_to_hash(fingerprint_str[ndx * 16:ndx * 16 + 16]))
-        fingerprints.insert(0, fingerprint)
-        ref_profile.pop('fingerprint', None)
-        profiles.insert(0, ref_profile)
 
     # loop through each pair and store the start/end frames in their profiles
     # then do the same for the remaining profile if count is odd
@@ -473,7 +501,7 @@ def process_directory(file_paths=[], ref_profile=None, log_level=0, log_file=Fal
     print_debug(a=["processed fingerprint pairs in: " + str(process_pairs_end - process_pairs_start)], log=log_level > 0, log_file=log_file)
 
     correct_errors_start = datetime.now()
-    correct_errors(fingerprints, profiles, log_level, log_file)
+    correct_errors(fingerprints, profiles, ref_profile is None, log_level, log_file)
     correct_errors_end = datetime.now()
     print_debug(a=["finished error correction in: " + str(correct_errors_end - correct_errors_start)], log=log_level > 0, log_file=log_file)
 
@@ -486,13 +514,13 @@ def process_directory(file_paths=[], ref_profile=None, log_level=0, log_file=Fal
     # use the fps and start/end frame values to calculate the timestamps for the intros and add them to the profiles
     for profile in profiles:
         if intro_duration(profile) < int(min_intro_length_sec * profile['fps']):
-            print_debug(a=['%s - intro is less than %s seconds - skipping' % (profile['path'], min_intro_length_sec)], log=log_level > 1, log_file=log_file)
+            print_debug(a=['%s - intro is less than %s seconds - skipping' % (profile['Path'], min_intro_length_sec)], log=log_level > 1, log_file=log_file)
             profile['start_frame'] = 0
             profile['end_frame'] = 0
         elif preroll_seconds > 0 and profile['end_frame'] > profile['start_frame'] + floor(profile['fps'] * preroll_seconds):
             profile['end_frame'] -= floor(profile['fps'] * preroll_seconds)
         get_timestamp_from_frame(profile)
-        print_debug(a=[profile['path'] + " start time: " + profile['start_time'] + " end time: " + profile['end_time']], log=log_level > 1, log_file=log_file)
+        print_debug(a=[profile['Path'] + " start time: " + profile['start_time'] + " end time: " + profile['end_time']], log=log_level > 1, log_file=log_file)
 
     end = datetime.now()
     print_debug(a=["ended at", end], log=log_level > 0, log_file=True)
@@ -539,7 +567,7 @@ def main(argv):
 
     common_video_extensions = ['.webm', '.mkv', '.avi', '.mts', '.m2ts', '.ts', '.mov', '.wmv', '.mp4', '.m4v', '.mpg', '.mpeg', '.m2v']
 
-    file_paths = []
+    profiles = []
     for child in Path(path).iterdir():
         if child.name[0] == '.':
             continue
@@ -548,10 +576,11 @@ def main(argv):
             if child.name.endswith(ext):
                 matched_ext = True
         if matched_ext:
-            file_paths.append(str(child.resolve()))
-    file_paths.sort()
+            profile = {}
+            profile['Path'] = str(child.resolve())
+            profiles.append(profile)
 
-    result = process_directory(file_paths=file_paths, log_level=log_level, log_file=log, cleanup=cleanup)
+    result = process_directory(file_paths=profiles, log_level=log_level, log_file=log, cleanup=cleanup)
     print(result)
 
 
