@@ -189,11 +189,11 @@ def get_or_create_fingerprint(profile, log_level, log_file):
     return fingerprint
 
 
-def check_files_exist(file_paths=[]):
-    if not file_paths:
+def check_files_exist(profiles=[]):
+    if not profiles:
         return False
-    for file in file_paths:
-        if not Path(file).exists():
+    for p in profiles:
+        if 'Path' not in p or not Path(p['Path']).exists():
             return False
     return True
 
