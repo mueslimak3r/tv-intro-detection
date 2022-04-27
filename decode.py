@@ -83,11 +83,11 @@ def get_timestamp_from_frame(profile):
     profile['end_time'] = str(timedelta(seconds=floor(end_time))).split('.')[0]
 
 
-def create_video_fingerprint(profile, log_level, log_file):
+def create_video_fingerprint(profile, hashfps, log_level, log_file):
     video_fingerprint = []
 
-    quarter_frames_or_first_X_mins = min(floor(((profile['total_frames'] / profile['fps']) / 4) * hash_fps), floor(max_fingerprint_mins * 60 * hash_fps))
-    video_fingerprint = get_fingerprint_ffmpeg(profile['Path'], hash_fps, quarter_frames_or_first_X_mins, log_level, log_file, session_timestamp, True)
+    quarter_frames_or_first_X_mins = min(floor(((profile['total_frames'] / profile['fps']) / 4) * hashfps), floor(max_fingerprint_mins * 60 * hashfps))
+    video_fingerprint = get_fingerprint_ffmpeg(profile['Path'], hashfps, quarter_frames_or_first_X_mins, log_level, log_file, session_timestamp, True)
 
     return video_fingerprint
 
@@ -182,7 +182,7 @@ def get_or_create_fingerprint(profile, log_level, log_file):
         fingerprint = read_fingerprint_file(Path(data_path / 'fingerprints' / replace(profile['Path']) / 'fingerprint.txt'), log_level, log_file)
     else:
         print_debug(a=['creating new fingerprint for [%s]' % profile['Path']], log=log_level > 1, log_file=log_file)
-        fingerprint = create_video_fingerprint(profile, log_level, log_file)
+        fingerprint = create_video_fingerprint(profile, hash_fps, log_level, log_file)
 
     end = datetime.now()
     print_debug(a=["processed fingerprint in %s for [%s]" % (str(end - start), profile['Path'])], log=log_level > 0, log_file=log_file)

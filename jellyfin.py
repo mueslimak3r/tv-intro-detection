@@ -94,7 +94,7 @@ def get_path_map(log_level=0):
     return path_map
 
 
-def check_season_valid(season=None, episodes=[], repair=False, log_level=0, log_file=False):
+def check_season_valid(season=None, episodes=[], repair=False, debug=False):
     if season is None or not episodes:
         return []
 
@@ -120,7 +120,7 @@ def check_season_valid(season=None, episodes=[], repair=False, log_level=0, log_
                             end_frame = int(profile['end_frame'])
                             if start_frame == 0 and end_frame == 0:
                                 should_add = True
-                                print_debug(a=['will repair ep [%s] of season [%s] of show [%s]' % (episode['Name'], season['Name'], season['SeriesName'])], log=log_level > 1)
+                                print_debug(a=['will repair ep [%s] of season [%s] of show [%s]' % (episode['Name'], season['Name'], season['SeriesName'])], log=debug, log_file=debug)
             if should_add:
                 filtered_episodes.append(episode)
     else:
@@ -131,29 +131,29 @@ def check_season_valid(season=None, episodes=[], repair=False, log_level=0, log_
             filtered_episodes.append(episode)
 
     if failed_to_find_files:
-        print_debug(a=['season [%s] of show [%s] - failed to access some of the media files' % (season['Name'], season['SeriesName'])], log=log_level > 1)
-        print_debug(a=['path for the first episode [%s]' % episodes[0]['Path']], log=log_level > 1)
+        print_debug(a=['season [%s] of show [%s] - failed to access some of the media files' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
+        print_debug(a=['path for the first episode [%s]' % episodes[0]['Path']], log=debug, log_file=debug)
 
     if not filtered_episodes:
         return []
     if len(filtered_episodes) > maximum_episodes_per_season:
-        print_debug(a=['skipping season [%s] of show [%s] since it contains %s episodes (more than max %s)' % (season['Name'], season['SeriesName'], len(filtered_episodes), maximum_episodes_per_season)], log=log_level > 1)
+        print_debug(a=['skipping season [%s] of show [%s] since it contains %s episodes (more than max %s)' % (season['Name'], season['SeriesName'], len(filtered_episodes), maximum_episodes_per_season)], log=debug, log_file=debug)
         return []
     
     duration_mins = int(filtered_episodes[0]['Duration'])
     if duration_mins > 0:
         duration_mins = duration_mins / 60 / 1000
     if filtered_episodes[0]['Duration'] < minimum_episode_duration * 60 * 1000:
-        print_debug(a=['skipping season [%s] of show [%s] - episodes are too short (%s minutes) (less than minimum %s minutes)' % (season['Name'], season['SeriesName'], duration_mins, minimum_episode_duration)], log=log_level > 1)
+        print_debug(a=['skipping season [%s] of show [%s] - episodes are too short (%s minutes) (less than minimum %s minutes)' % (season['Name'], season['SeriesName'], duration_mins, minimum_episode_duration)], log=debug, log_file=debug)
         return []
     
     season_hash_exists = 1 if season['SeasonFingerprint'] is not None else 0
     if len(filtered_episodes) + season_hash_exists < 2:
-        print_debug(a=['skipping season [%s] of show [%s] - it doesn\'t contain at least 2 episodes' % (season['Name'], season['SeriesName'])], log=log_level > 1)
+        print_debug(a=['skipping season [%s] of show [%s] - it doesn\'t contain at least 2 episodes' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
         return []
 
     if len(filtered_episodes) > 0 and len(episodes) - len(filtered_episodes) > 0:
-        print_debug(a=['season [%s] of show [%s] - will skip %s of %s episodes' % (season['Name'], season['SeriesName'], len(episodes) - len(filtered_episodes), len(episodes))], log=log_level > 0, log_file=log_file)
+        print_debug(a=['season [%s] of show [%s] - will skip %s of %s episodes' % (season['Name'], season['SeriesName'], len(episodes) - len(filtered_episodes), len(episodes))], log=True, log_file=debug)
     return filtered_episodes
 
 
@@ -177,9 +177,9 @@ def check_if_in_list_of_dict(dict_list, value):
     return -1
 
 
-def remake_season_fingerprint(episodes=[], season_fingerprint=None, log_level=0, log_file=False):
+def remake_season_fingerprint(episodes=[], season_fingerprint=None, debug=False):
     if not episodes:
-        return ''
+        return None
 
     ndx = -1
     if 'EpisodeId' in season_fingerprint:
@@ -197,8 +197,8 @@ def remake_season_fingerprint(episodes=[], season_fingerprint=None, log_level=0,
                 break
 
     if ndx == -1:
-        print_debug(a=['failed to match season fingerprint to episode in jellyfin'], log=log_level > 1, log_file=log_file)
-        return ''
+        print_debug(a=['failed to match season fingerprint to episode in jellyfin'], log=debug, log_file=debug)
+        return None
 
     profile = season_fingerprint
     profile.update(episodes[ndx])
@@ -206,11 +206,11 @@ def remake_season_fingerprint(episodes=[], season_fingerprint=None, log_level=0,
         profile.pop('path', None)
     profile['fingerprint'] = None
 
-    fingerprint = create_video_fingerprint(profile, log_level, log_file)
+    fingerprint = create_video_fingerprint(profile, hash_fps, 2 if debug else 0, debug)
 
     if not fingerprint:
-        print_debug(a=['failed to create new fingerprint'], log=log_level > 1, log_file=log_file)
-        return ''
+        print_debug(a=['failed to create new fingerprint'], log=debug, log_file=debug)
+        return None
     
     tmp_start_frame = floor(profile['start_frame'] / (profile['fps'] / hash_fps)) if profile['start_frame'] > 0 else 0
     tmp_end_frame = floor(profile['end_frame'] / (profile['fps'] / hash_fps)) if profile['end_frame'] > 0 else 0
@@ -220,15 +220,17 @@ def remake_season_fingerprint(episodes=[], season_fingerprint=None, log_level=0,
         fingerprint_str = ''
         for f in trimmed_fingerprint:
             fingerprint_str += str(f)
-        return fingerprint_str
+        profile['fingerprint'] = fingerprint_str
+        profile['hash_fps'] = hash_fps
+        return profile
     except BaseException as err:
-        print_debug(a=['failed to trim new fingerprint'], log=log_level > 1, log_file=log_file)
-    return ''
+        print_debug(a=['failed to trim new fingerprint'], log=debug, log_file=debug)
+    return None
 
 
-def get_season_fingerprint(season=None, episodes=[], log_level=0, log_file=False):
+def get_season_fingerprint(season=None, episodes=[], debug=False):
     if season is None:
-        return
+        return None
     
     season_fp_dict = None
     path = Path(data_path / 'jellyfin_cache' / str(season['SeriesId']) / str(season['SeasonId']) / ('season' + '.json'))
@@ -237,23 +239,22 @@ def get_season_fingerprint(season=None, episodes=[], log_level=0, log_file=False
             season_fp_dict = json.load(json_file)
 
     if season_fp_dict is None:
-        return
+        return None
     
     # print(season_fp_dict)
     
     fingerprint_list = []
     if 'fingerprint' in season_fp_dict:
-        fingerprint_list = read_fingerprint(season_fp_dict['fingerprint'], log_level, log_file)
+        fingerprint_list = read_fingerprint(season_fp_dict['fingerprint'], 2 if debug else 0, debug)
 
     if not fingerprint_list:
-        print_debug(a=['trying to remake season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=log_level > 1, log_file=log_file)
-        new_fingerprint = remake_season_fingerprint(episodes, season_fp_dict, log_level, log_file)
-        if new_fingerprint != '':
-            season_fp_dict['fingerprint'] = new_fingerprint
+        print_debug(a=['trying to remake season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
+        season_fp_dict = remake_season_fingerprint(episodes, season_fp_dict, 2 if debug else 0, debug)
+        if season_fp_dict is not None:
             with path.open('w+') as json_file:
                 json.dump(season_fp_dict, json_file, indent=4)
     else:
-        print_debug(a=['found valid season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=log_level > 1, log_file=log_file)
+        print_debug(a=['found valid season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
     return season_fp_dict
 
 
@@ -308,9 +309,9 @@ def get_jellyfin_shows(reverse_sort=False, repair=False, log_level=0, log_file=F
             if not episodes:
                 continue
 
-            season['SeasonFingerprint'] = get_season_fingerprint(season=season, episodes=episodes, log_level=log_level, log_file=log_file)
+            season['SeasonFingerprint'] = get_season_fingerprint(season=season, episodes=episodes, debug=log_level > 1)
 
-            season['Episodes'] = check_season_valid(season, episodes, repair, log_level, log_file)
+            season['Episodes'] = check_season_valid(season, episodes, repair, debug=log_level > 1)
             if season['Episodes']:
                 episode_count += len(season['Episodes'])
                 seasons.append(season)
