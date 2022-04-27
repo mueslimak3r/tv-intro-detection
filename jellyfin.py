@@ -228,6 +228,13 @@ def remake_season_fingerprint(episodes=[], season_fingerprint=None, debug=False)
     return None
 
 
+def intro_duration(profile):
+    intro_duration = profile['end_frame'] - profile['start_frame']
+    if intro_duration < 0:
+        intro_duration = 0
+    return intro_duration
+
+
 def get_season_fingerprint(season=None, episodes=[], debug=False):
     if season is None:
         return None
@@ -247,7 +254,13 @@ def get_season_fingerprint(season=None, episodes=[], debug=False):
 
     profile_modified = False
 
-    if not fingerprint_list:
+    if fingerprint_list and abs(len(fingerprint_list) - floor(intro_duration(season_fp_dict) / (season_fp_dict['fps'] / hash_fps))) > 1:
+        print_debug(a=['season fingerprint is wrong length %s instead of %s for season %s of show %s' % (len(fingerprint_list) * (season_fp_dict['fps'] / hash_fps),
+                                                                                                         intro_duration(season_fp_dict),
+                                                                                                         season['Name'], season['SeriesName'])], log=debug, log_file=debug)
+
+    if not fingerprint_list or abs(len(fingerprint_list) - floor(intro_duration(season_fp_dict) / (season_fp_dict['fps'] / hash_fps))) > 1:
+
         print_debug(a=['trying to remake season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
         season_fp_dict = remake_season_fingerprint(episodes, season_fp_dict, debug)
         profile_modified = True

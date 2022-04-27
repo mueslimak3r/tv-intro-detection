@@ -464,7 +464,7 @@ def process_directory(profiles=[], ref_profile=None, hashfps=2, log_level=0, log
 
     if ref_profile is not None and 'hash_fps' in ref_profile and ref_profile['hash_fps'] == hash_fps:
         fingerprint = read_fingerprint(ref_profile['fingerprint'], log_level, log_file)
-        if fingerprint:
+        if fingerprint and abs(len(fingerprint) - floor(intro_duration(ref_profile) / (ref_profile['fps'] / hash_fps))) < 2:
             print_debug(a=["loaded reference profile"], log=log_level > 0, log_file=log_file)
             print_timestamp(ref_profile['Path'], ref_profile['start_frame'], ref_profile['end_frame'], ref_profile['fps'], log_level, log_file)
             fingerprints.insert(0, fingerprint)
