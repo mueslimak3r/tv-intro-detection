@@ -180,7 +180,8 @@ def get_or_create_fingerprint(profile, log_level, log_file):
 
     if Path(data_path / 'fingerprints' / replace(profile['Path']) / 'fingerprint.txt').exists():
         fingerprint = read_fingerprint_file(Path(data_path / 'fingerprints' / replace(profile['Path']) / 'fingerprint.txt'), log_level, log_file)
-    else:
+    
+    if not fingerprint:
         print_debug(a=['creating new fingerprint for [%s]' % profile['Path']], log=log_level > 1, log_file=log_file)
         fingerprint = create_video_fingerprint(profile, hash_fps, log_level, log_file)
 
@@ -436,8 +437,8 @@ def process_directory(profiles=[], ref_profile=None, hashfps=2, log_level=0, log
         print_debug(a=['input files invalid or cannot be accessed'], log=log_level > 0, log_file=log_file)
         return {}
     
-    if len(profiles) < 2:
-        print_debug(a=['file list size is less than 2 - skipping'], log=log_level > 0, log_file=log_file)
+    if (ref_profile is not None and len(profiles) < 1) or (ref_profile is None and len(profiles) < 2):
+        print_debug(a=['fewer than 2 valid fingerprints were found - skipping'], log=log_level > 0, log_file=log_file)
         return {}
     
     print_debug(a=['processing %s files' % len(profiles)], log=log_level > 0, log_file=log_file)
@@ -448,7 +449,6 @@ def process_directory(profiles=[], ref_profile=None, hashfps=2, log_level=0, log
         except OSError as e:
             print_debug(a=["Error: %s : %s" % ('fingerprints', e.strerror)], log_file=log_file)
 
-    profiles = []  # list of dictionaries containing path, start/end frame & time, fps
     fingerprints = []  # list of hash values
 
     hashing_start = datetime.now()
