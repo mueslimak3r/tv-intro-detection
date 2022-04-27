@@ -259,7 +259,7 @@ def get_season_fingerprint(season=None, episodes=[], debug=False):
                                                                                                          floor(intro_duration(season_fp_dict) / (season_fp_dict['fps'] / hash_fps)),
                                                                                                          season['Name'], season['SeriesName'])], log=debug, log_file=debug)
 
-    if not fingerprint_list or abs(len(fingerprint_list) - floor(intro_duration(season_fp_dict) / (season_fp_dict['fps'] / hash_fps))) > 1:
+    if not fingerprint_list or abs(len(fingerprint_list) - floor(intro_duration(season_fp_dict) / (season_fp_dict['fps'] / hash_fps))) > 2:
 
         print_debug(a=['trying to remake season fingerprint for season %s of show %s' % (season['Name'], season['SeriesName'])], log=debug, log_file=debug)
         season_fp_dict = remake_season_fingerprint(episodes, season_fp_dict, debug)
