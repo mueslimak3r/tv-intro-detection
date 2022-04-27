@@ -254,7 +254,7 @@ def get_season_fingerprint(season=None, episodes=[], debug=False):
 
     profile_modified = False
 
-    if fingerprint_list and abs(len(fingerprint_list) - floor(intro_duration(season_fp_dict) / (season_fp_dict['fps'] / hash_fps))) > 1:
+    if fingerprint_list and abs(len(fingerprint_list) - floor(intro_duration(season_fp_dict) / (season_fp_dict['fps'] / hash_fps))) > 2:
         print_debug(a=['season fingerprint is wrong length %s instead of %s for season %s of show %s' % (len(fingerprint_list),
                                                                                                          floor(intro_duration(season_fp_dict) / (season_fp_dict['fps'] / hash_fps)),
                                                                                                          season['Name'], season['SeriesName'])], log=debug, log_file=debug)
