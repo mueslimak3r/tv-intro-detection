@@ -241,10 +241,8 @@ def get_season_fingerprint(season=None, episodes=[], debug=False):
     if season_fp_dict is None:
         return None
     
-    # print(season_fp_dict)
-    
     fingerprint_list = []
-    if 'fingerprint' in season_fp_dict:
+    if 'fingerprint' in season_fp_dict and 'hash_fps' in season_fp_dict and season_fp_dict['hash_fps'] == hash_fps:
         fingerprint_list = read_fingerprint(season_fp_dict['fingerprint'], 2 if debug else 0, debug)
 
     if not fingerprint_list:
