@@ -123,13 +123,14 @@ def get_start_end(print1, print1_fps, print2, print2_fps, log_level):
     print_debug(a=['swapped %s' % swap], log=log_level > 1)
 
     highest_equal_frames = []
-    for k in range(1, len(longest)):
-        equal_frames = get_equal_frames(longest[-k:], shortest, len(longest) - k, 1)
+    for k in range(0, len(longest)):
+        kval = k if k > 0 else 1
+        equal_frames = get_equal_frames(longest[-kval:], shortest, len(longest) - kval, 0)
         if len(equal_frames) > len(highest_equal_frames):
             highest_equal_frames = equal_frames
 
         if k < len(shortest):
-            equal_frames = get_equal_frames(longest, shortest[k:], 1, k)
+            equal_frames = get_equal_frames(longest, shortest[k:], 0, k)
             if len(equal_frames) > len(highest_equal_frames):
                 highest_equal_frames = equal_frames
 
