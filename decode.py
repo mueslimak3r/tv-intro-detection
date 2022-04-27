@@ -375,7 +375,7 @@ def correct_errors(fingerprints, profiles, ref_profile, log_level=0, log_file=Fa
                 repaired += 1
                 print_debug(a=['\nreprocess successful for file [%s] new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
                 print_timestamp(profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
-        elif guessed_start_diff < int(15 * profiles[nprofile]['fps']):
+        elif intro_duration(profiles[nprofile]) > 2 and guessed_start_diff < int(15 * profiles[nprofile]['fps']):
             if nprofile in non_conforming_profiles:
                 repaired += 1
                 profiles[nprofile]['start_frame'] = guessed_start
