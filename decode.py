@@ -327,6 +327,7 @@ def correct_errors(fingerprints, profiles, save_sf=True, log_level=0, log_file=F
     ref_profile_ndx = conforming_profiles[int(floor(len(conforming_profiles) / 2))][0]
 
     if save_season_fingerprint:
+        print_debug(a=['saving season fingerprint'], log=log_level > 0, log_file=log_file)
         save_season_fingerprint(fingerprints, profiles, ref_profile_ndx, filtered_lengths, shortest_duration)
 
     if len(non_conforming_profiles) < 1:
