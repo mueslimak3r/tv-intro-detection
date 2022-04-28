@@ -163,10 +163,10 @@ def read_fingerprint_file(file, log_level, log_file):
         return []
 
     fingerprint = []
-    print_debug(a=['loading existing fingerprint for [%s]' % file], log=log_level > 1, log_file=log_file)
-    with Path(data_path / 'fingerprints' / replace(file) / 'fingerprint.txt').open('r') as text_file:
+    print_debug(a=['loading existing fingerprint [%s]' % file], log=log_level > 1, log_file=log_file)
+    with Path(file).open('r') as text_file:
         fingerprint_str = text_file.read()
-        read_fingerprint(fingerprint_str, log_level, log_file)
+        fingerprint = read_fingerprint(fingerprint_str, log_level, log_file)
     return fingerprint
 
 
@@ -345,7 +345,7 @@ def correct_errors(fingerprints, profiles, ref_profile, log_level=0, log_file=Fa
         tmp_profile.update(profiles[ref_profile_ndx])
         tmp_index = len(fingerprints)
 
-        if ref_profile is None or profiles[ref_profile_ndx]['Path'] == ref_profile['Path']:
+        if ref_profile is None or profiles[ref_profile_ndx]['Path'] != ref_profile['Path']:
             tmp_start_frame = floor((profiles[ref_profile_ndx]['start_frame'] / profiles[ref_profile_ndx]['fps']) * hash_fps) if profiles[ref_profile_ndx]['start_frame'] > 0 else 0
             tmp_end_frame = floor((profiles[ref_profile_ndx]['end_frame'] / profiles[ref_profile_ndx]['fps']) * hash_fps) if profiles[ref_profile_ndx]['end_frame'] > 0 else 0
             fingerprints.append(fingerprints[ref_profile_ndx][tmp_start_frame:tmp_end_frame + 1])
@@ -543,11 +543,12 @@ def process_directory(profiles=[], ref_profile=None, hashfps=2, log_level=0, log
 def main(argv):
 
     path = ''
+    ref_path = ''
     log_level = 0
     cleanup = False
     log = False
     try:
-        opts, args = getopt.getopt(argv, "hi:dvcl")
+        opts, args = getopt.getopt(argv, "hi:dvclr:")
     except getopt.GetoptError:
         print_debug(['decode.py -i <path> -v (verbose - some logging) -d (debug - most logging) -c (cleanup) -s (slow mode) -l (log to file)\n'])
         sys.exit(2)
@@ -566,12 +567,19 @@ def main(argv):
             log_level = 1
         elif opt == '-c':
             cleanup = True
+        elif opt == '-r':
+            ref_path = arg
 
     if path == '' or not Path(path).is_dir():
         print_debug(['decode.py -i <path> -v (verbose - some logging) -d (debug - most logging) -c (cleanup) -s (slow mode) -l (log to file)\n'])
         sys.exit(2)
 
     common_video_extensions = ['.webm', '.mkv', '.avi', '.mts', '.m2ts', '.ts', '.mov', '.wmv', '.mp4', '.m4v', '.mpg', '.mpeg', '.m2v']
+
+    ref_profile = None
+    if ref_path != '' and Path(ref_path).exists():
+        with Path(ref_path).open('r') as profile_json:
+            ref_profile = json.load(profile_json)
 
     profiles = []
     for child in Path(path).iterdir():
@@ -586,7 +594,7 @@ def main(argv):
             profile['Path'] = str(child.resolve())
             profiles.append(profile)
 
-    result = process_directory(file_paths=profiles, log_level=log_level, log_file=log, cleanup=cleanup)
+    result = process_directory(profiles=profiles, ref_profile=ref_profile, log_level=log_level, log_file=log, cleanup=cleanup)
     print(result)
 
 
