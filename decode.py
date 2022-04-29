@@ -126,15 +126,17 @@ def get_start_end(print1, print1_fps, print2, print2_fps, log_level):
     highest_equal_frames = []
     for k in range(1, len(longest)):
         equal_frames = get_equal_frames(longest[-k:], shortest, len(longest) - k, 0)
-        tmp_duration = equal_frames[-1][0] - equal_frames[0][0]
-        if len(equal_frames) > len(highest_equal_frames) and tmp_duration >= 0 and tmp_duration < len(shortest):
-            highest_equal_frames = equal_frames
-
-        if k < len(shortest):
-            equal_frames = get_equal_frames(longest, shortest[k:], 0, k)
+        if equal_frames and len(equal_frames > 1):
             tmp_duration = equal_frames[-1][0] - equal_frames[0][0]
             if len(equal_frames) > len(highest_equal_frames) and tmp_duration >= 0 and tmp_duration < len(shortest):
                 highest_equal_frames = equal_frames
+
+        if k < len(shortest):
+            equal_frames = get_equal_frames(longest, shortest[k:], 0, k)
+            if equal_frames and len(equal_frames > 1):
+                tmp_duration = equal_frames[-1][0] - equal_frames[0][0]
+                if len(equal_frames) > len(highest_equal_frames) and tmp_duration >= 0 and tmp_duration < len(shortest):
+                    highest_equal_frames = equal_frames
 
     if highest_equal_frames:
         if swap:
