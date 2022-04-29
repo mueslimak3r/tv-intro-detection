@@ -104,7 +104,6 @@ def get_equal_frames(print1, print2, start1, start2):
         frame2 = print2[j * check_frame]
         if frame1 - frame2 < 8:
             equal_frames.append((int(start1 + (j * check_frame)), int(start2 + (j * check_frame))))
-
     return equal_frames
 
 
@@ -125,15 +124,16 @@ def get_start_end(print1, print1_fps, print2, print2_fps, log_level):
     print_debug(a=['swapped %s' % swap], log=log_level > 1)
 
     highest_equal_frames = []
-    for k in range(0, len(longest)):
-        kval = k if k > 0 else 1
-        equal_frames = get_equal_frames(longest[-kval:], shortest, len(longest) - kval, 0)
-        if len(equal_frames) > len(highest_equal_frames):
+    for k in range(1, len(longest)):
+        equal_frames = get_equal_frames(longest[-k:], shortest, len(longest) - k, 0)
+        tmp_duration = equal_frames[-1][0] - equal_frames[0][0]
+        if len(equal_frames) > len(highest_equal_frames) and tmp_duration >= 0 and tmp_duration < len(shortest):
             highest_equal_frames = equal_frames
 
         if k < len(shortest):
             equal_frames = get_equal_frames(longest, shortest[k:], 0, k)
-            if len(equal_frames) > len(highest_equal_frames):
+            tmp_duration = equal_frames[-1][0] - equal_frames[0][0]
+            if len(equal_frames) > len(highest_equal_frames) and tmp_duration >= 0 and tmp_duration < len(shortest):
                 highest_equal_frames = equal_frames
 
     if highest_equal_frames:
@@ -263,6 +263,12 @@ def sort_conforming_profile(profile_tuple):
 
 
 def correct_errors(fingerprints, profiles, ref_profile, log_level=0, log_file=False):
+    # skip outlier rejection when there is only the reference profile and one other file
+    if ref_profile is not None and len(fingerprints) == 2:
+        diff_from_avg = abs(intro_duration(profiles[1]) - ref_profile['average_frames'])
+        if diff_from_avg < int(15 * profiles[1]['fps']):
+            print_debug(a=['single file conforms to reference profile'], log=log_level > 0, log_file=log_file)
+            return
 
     # build a list of intro lengths with outliers rejected
     lengths = []
