@@ -89,7 +89,7 @@ def create_video_fingerprint(profile, hashfps, log_level, log_file):
     video_fingerprint = []
 
     quarter_frames_or_first_X_mins = min(floor(((profile['total_frames'] / profile['fps']) / 4) * hashfps), floor(max_fingerprint_mins * 60 * hashfps))
-    video_fingerprint = get_fingerprint_ffmpeg(profile['Path'], hashfps, quarter_frames_or_first_X_mins, log_level, log_file, session_timestamp, True)
+    video_fingerprint = get_fingerprint_ffmpeg(profile['Path'], hashfps, quarter_frames_or_first_X_mins, log_level, log_file, session_timestamp)
 
     return video_fingerprint
 
@@ -445,6 +445,8 @@ def process_directory(profiles=[], ref_profile=None, hashfps=2, log_level=0, log
     start = datetime.now()
     print_debug(a=['started at', start], log=log_level > 0, log_file=log_file)
     print_debug(a=["Check Frame: %s\n" % str(check_frame)], log=log_level > 0, log_file=log_file)
+    print_debug(a=["Hash fps: %s\n" % str(hash_fps)], log=log_level > 0, log_file=log_file)
+
     if cleanup:
         print_debug(a=['fingerprint files will be cleaned up'], log=log_level > 0, log_file=log_file)
 

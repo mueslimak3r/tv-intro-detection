@@ -2,10 +2,9 @@ import os
 import re
 import cv2
 import imagehash
-import shutil
 import sys
 import getopt
-import subprocess
+from subprocess import Popen, PIPE, SubprocessError
 
 from pathlib import Path
 from PIL import Image
@@ -17,6 +16,7 @@ data_path = Path(os.environ['DATA_DIR']) if 'DATA_DIR' in os.environ else Path(c
 session_timestamp = datetime.now().strftime("%Y_%m_%d-%I_%M_%S_%p")
 
 img_extension = '.jpeg'
+img_size = (384, 216)
 
 
 def print_debug(a=[], log=True, log_file=False):
@@ -33,7 +33,8 @@ def print_debug(a=[], log=True, log_file=False):
 
 
 def write_fingerprint(path, fingerprint):
-    path = Path(data_path / 'fingerprints' / replace(path) / 'fingerprint.txt')
+    Path(data_path / 'fingerprints' / replace(str(path))).mkdir(parents=True, exist_ok=True)
+    path = Path(data_path / 'fingerprints' / replace(str(path)) / 'fingerprint.txt')
     with path.open('w+') as text_file:
         text_file.write(fingerprint)
 
@@ -47,62 +48,56 @@ def get_frames(path, hash_fps, frame_nb, log_level, log_file):
         return False
     print_debug(a=['running ffmpeg'], log=log_level > 0, log_file=log_file)
     start = datetime.now()
-    filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / ('frame-%08d' + img_extension))
-    with Path(os.devnull).open('w') as fp:
-        process = subprocess.Popen(args=["ffmpeg", "-i", path, "-r", str(hash_fps), "-frames:v", str(frame_nb), "-s", "384x216", str(filename)], stdout=fp, stderr=fp)
-        process.wait()
+
+    command = ["ffmpeg", "-i", path, "-vf", 'fps=%s' % str(hash_fps), "-frames:v", str(frame_nb), "-f", "image2pipe", "-pix_fmt", "rgb24", "-vcodec", "rawvideo", "-s", "384x216", "-"]
+
+    with Path(os.devnull).open('w') as devnull_fp:
+        proc = Popen(command, stdout=PIPE, stderr=devnull_fp, bufsize=10**8)
+
+        filein = proc.stdout
+        bytes_list = []
+        for _ in range(frame_nb):
+            try:
+                output = filein.read(img_size[0] * img_size[1] * 3)
+            except SubprocessError as err:
+                filein.close()
+                proc.kill()
+                return [], False
+            bytes_list.append(output)
+        filein.close()
+        proc.wait()
         end = datetime.now()
         print_debug(a=["ran ffmpeg in %s" % str(end - start)], log=log_level > 0, log_file=log_file)
-        return process.returncode == 0
+        return bytes_list, proc.returncode == 0
 
 
-def check_frames_already_exist(path, frame_nb):
-    for ndx in range(1, frame_nb + 1):
-        filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / ('frame-%s%s' % (str(ndx).rjust(8, '0'), img_extension)))
-        if not filename.exists():
-            return False
-    return True
-
-
-def get_fingerprint_ffmpeg(path, hash_fps, frame_nb, log_level=1, log_file=False, log_timestamp=None, cleanup=False):
+def get_fingerprint_ffmpeg(path, hash_fps, frame_nb, log_level=1, log_file=False, log_timestamp=None):
     global session_timestamp
 
     if path is None or path == '' or frame_nb == 0:
-        return ''
+        return []
 
     if log_timestamp is not None:
         session_timestamp = log_timestamp
 
-    Path(data_path / 'fingerprints' / replace(path) / 'frames').mkdir(parents=True, exist_ok=True)
-    if not check_frames_already_exist(path, frame_nb):
-        if not get_frames(path, hash_fps, frame_nb, log_level, log_file):
-            print_debug(a=['ffmpeg error'], log=log_level > 0, log_file=log_file)
-            return ''
-    else:
-        print_debug(a=['skipping ffmpeg'], log=log_level > 0, log_file=log_file)
-    
-    start = datetime.now()
+    bytes_list, ret = get_frames(path, hash_fps, frame_nb, log_level, log_file)
+
+    if not bytes_list or not ret:
+        print_debug(a=['ffmpeg error'], log=log_level > 0, log_file=log_file)
+        return []
+
     fingerprint_str = ""
     fingerprint_list = []
 
-    for ndx in range(1, frame_nb + 1):
-        filename = Path(data_path / 'fingerprints' / replace(path) / 'frames' / ('frame-%s%s' % (str(ndx).rjust(8, '0'), img_extension)))
-        if not filename.exists():
-            print_debug(a=["Error - Possible Corruption - frame file missing: %s for video %s" % (filename, path)], log=log_level > 0, log_file=log_file)
-            break
-        try:
-            with Image.open(filename) as image:
-                frame_fingerprint = imagehash.dhash(image)
-                fingerprint_str += str(frame_fingerprint)
-                fingerprint_list.append(frame_fingerprint)
-        except BaseException as err:
-            print_debug(a=["Error - Possible Corruption - frame file error: %s : %s" % (filename, err.strerror)], log=log_level > 0, log_file=log_file)
-            break
-    if cleanup:
-        try:
-            shutil.rmtree(Path(data_path / 'fingerprints' / replace(path) / 'frames'))
-        except OSError as e:
-            print_debug(a=["Error: %s : %s" % (Path(data_path / 'fingerprints' / replace(path) / 'frames'), e.strerror)], log=log_level > 0, log_file=log_file)
+    start = datetime.now()
+    ndx = 0
+    for frame_bytes in bytes_list:
+        img = Image.frombytes('RGB', img_size, frame_bytes)
+        frame_fingerprint = imagehash.dhash(img)
+        fingerprint_str += str(frame_fingerprint)
+        fingerprint_list.append(frame_fingerprint)
+        ndx += 1
+
     if fingerprint_str != '':
         write_fingerprint(path, fingerprint_str)
     end = datetime.now()
@@ -114,8 +109,6 @@ def main(argv):
 
     dir = ''
     log_level = 0
-    cleanup = False
-    slow_mode = False
     try:
         opts, args = getopt.getopt(argv, "hi:dvc")
     except getopt.GetoptError:
@@ -132,10 +125,6 @@ def main(argv):
             log_level = 2
         elif opt == '-v':
             log_level = 1
-        elif opt == '-c':
-            cleanup = True
-        elif opt == '-s':
-            slow_mode = True
 
     if dir == '' or not Path(dir).is_dir():
         print_debug(['decode.py -i <path> -v (verbose - some logging) -d (debug - most logging) -c (cleanup) -s (slow mode)\n'])
@@ -160,7 +149,7 @@ def main(argv):
                 fps = video.get(cv2.CAP_PROP_FPS)
                 quarter_frames_or_first_X_mins = min(int(frames / 4), int(fps * 60 * max_fingerprint_mins))
                 video.release()
-                result = get_fingerprint_ffmpeg(path, quarter_frames_or_first_X_mins, log_level, True, None, cleanup)
+                result = get_fingerprint_ffmpeg(path, quarter_frames_or_first_X_mins, log_level, True, None)
         end = datetime.now()
         print_debug(["total runtime %s" % str(end - start)])
     else:
