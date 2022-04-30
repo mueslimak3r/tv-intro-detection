@@ -2,7 +2,6 @@ import os
 import re
 import cv2
 import imagehash
-import shutil
 import sys
 import getopt
 from subprocess import Popen, PIPE, SubprocessError
