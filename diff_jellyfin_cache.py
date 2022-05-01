@@ -168,7 +168,7 @@ def filter_dirs(old_path: Path, new_path: Path):
     contents_not_in_both.sort()
 
     if contents_not_in_both:
-        print('not in both:')
+        print('series not in both:')
         for e in contents_not_in_both:
             if e in old_path_contents:
                 path = Path(old_path / e)
@@ -210,6 +210,10 @@ def diff_data(old_path: Path, new_path: Path):
 
     diff_threshold = 2
 
+    print('\n\n------------------------------------------------\n\n')
+
+    print('series in both:')
+
     for Id in SeriesIds:
         has_logged_series = False
 
@@ -243,11 +247,7 @@ def diff_data(old_path: Path, new_path: Path):
                         print('%s:' % str(seasonName).rjust(len(str(seasonName)) + 4))
                         has_logged_season = True
 
-                    log_str = 'diff %s seconds' % diff
-                    print('%s' % str(log_str).rjust(len(str(log_str)) + 6))
                     log_str = 'intro duration for episode [%s] of season [%s] series [%s] differs' % (old_ep['Name'], old_ep['SeasonName'], old_ep['SeriesName'])
-                    print('%s' % str(log_str).rjust(len(str(log_str)) + 6))
-                    log_str = 'intro duration for episode [%s] of season [%s] series [%s] differs' % (new_ep['Name'], new_ep['SeasonName'], new_ep['SeriesName'])
                     print('%s' % str(log_str).rjust(len(str(log_str)) + 6))
                     start1, end1 = get_timestamp(old_ep['start_time_ms'], old_ep['end_time_ms'])
                     log_str = 'old start: %s end %s' % (start1, end1)
@@ -255,6 +255,9 @@ def diff_data(old_path: Path, new_path: Path):
                     start2, end2 = get_timestamp(new_ep['start_time_ms'], new_ep['end_time_ms'])
                     log_str = 'new start: %s end %s\n' % (start2, end2)
                     print('%s' % str(log_str).rjust(len(str(log_str)) + 6))
+                    log_str = 'diff %s seconds' % diff
+                    print('%s' % str(log_str).rjust(len(str(log_str)) + 6))
+
     percent_diff = (total_diffs / total_episodes) * 100
     print('%s/%s episodes ( %s percent ) changed more than %s sec' % (total_diffs, total_episodes, percent_diff, diff_threshold))
 

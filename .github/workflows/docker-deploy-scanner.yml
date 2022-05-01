@@ -8,6 +8,7 @@ on:
       - '**.py'
       - 'Dockerfile_Jellyfin-Intro-Scanner'
       - '!jellyfin_auto_skip.py'
+      - '!diff_jellyfin_cache.py'
       - '!Dockerfile_Jellyfin-Intro-Skipper'
       - '!**.md'
       - '!**.gitignore'
