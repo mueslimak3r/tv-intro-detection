@@ -377,22 +377,23 @@ def correct_errors(fingerprints, profiles, ref_profile, log_level=0, log_file=Fa
     repaired = 0
     for nprofile in range(0, len(profiles)):
         diff_from_avg = abs(intro_duration(profiles[nprofile]) - average)
-        guessed_start = profiles[nprofile]['end_frame'] - shortest_duration
+        guessed_start = floor(profiles[nprofile]['end_frame'] - (shortest_duration / 2))
         if guessed_start < 0:
             guessed_start = 0
         guessed_start_diff = abs(profiles[nprofile]['end_frame'] - guessed_start - average)
-        if intro_duration(profiles[nprofile]) in new_filtered_lengths and \
-                diff_from_avg < int(15 * profiles[nprofile]['fps']):
+        if intro_duration(profiles[nprofile]) >= int(min_intro_length_sec * profiles[nprofile]['fps']):
             if nprofile in non_conforming_profiles:
                 repaired += 1
                 print_debug(a=['\nreprocess successful for file [%s] new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
                 print_timestamp(profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
-        elif intro_duration(profiles[nprofile]) > 2 and guessed_start_diff < int(15 * profiles[nprofile]['fps']):
-            if nprofile in non_conforming_profiles:
-                repaired += 1
-                profiles[nprofile]['start_frame'] = guessed_start
-                print_debug(a=['\nreprocess successful by guessing start for file [%s] - new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
-                print_timestamp(profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
+            '''
+            elif intro_duration(profiles[nprofile]) > int(2 * profiles[nprofile]['fps']) and guessed_start_diff < int(15 * profiles[nprofile]['fps']):
+                if nprofile in non_conforming_profiles:
+                    repaired += 1
+                    profiles[nprofile]['start_frame'] = guessed_start
+                    print_debug(a=['\nreprocess successful by guessing start for file [%s] - new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
+                    print_timestamp(profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'], profiles[nprofile]['fps'], log_level, log_file)
+            '''
         elif nprofile in non_conforming_profiles:
             print_debug(a=['\nfailed to locate intro by reprocessing %s' % profiles[nprofile]['Path']], log_file=log_file)
             print_debug(a=['file [%s] new start %s end %s' % (profiles[nprofile]['Path'], profiles[nprofile]['start_frame'], profiles[nprofile]['end_frame'])], log=log_level > 0, log_file=log_file)
