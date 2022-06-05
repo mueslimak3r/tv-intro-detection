@@ -28,9 +28,15 @@ cooldown_time = 5
 client = None
 should_exit = False
 
+SESSIONS_CULL_COOLDOWN = 300
+SESSION_CULL_STALE_AGE = 60
+active_sessions = {}
+last_sessions_cull = datetime.now(timezone.utc)
+
 
 def monitor_sessions(monitor_all_users=False):
     global should_exit
+    global active_sessions
 
     if client is None:
         return False
@@ -59,13 +65,14 @@ def monitor_sessions(monitor_all_users=False):
         sessionId = session['Id']
 
         # print('user id %s' % session['UserId'])
-        print(session['DeviceName'])
+        print('\nclient: [%s] session: [%s]' % (session['DeviceName'], sessionId))
 
         lastPlaybackTime = arrow.get(session['LastPlaybackCheckIn']).to('utc').datetime
         timeDiff = start - lastPlaybackTime
 
         item = session['NowPlayingItem']
-        if not session['PlayState']['IsPaused'] and timeDiff.seconds < 5 and 'Id' in item:
+        print('seconds since last client playback check in: %s' % timeDiff.seconds)
+        if not session['PlayState']['IsPaused'] and timeDiff.seconds < 8 and 'Id' in item:
             if 'SeriesName' in item and 'SeasonName' in item and 'Name' in item:
                 print('currently playing %s - %s - Episode [%s]' % (item['SeriesName'], item['SeasonName'], item['Name']))
             print('item id %s' % item['Id'])
@@ -97,7 +104,32 @@ def monitor_sessions(monitor_all_users=False):
             print('no useable intro data - start_time and end_time are both 0')
             continue
 
-        if position_ticks < start_time_ticks or position_ticks > end_time_ticks:
+        print('pos %ss intro start %ss end %ss' % (position_ticks / TICKS_PER_MS / 1000, start_time_ticks / TICKS_PER_MS / 1000, end_time_ticks / TICKS_PER_MS / 1000))
+
+        # ignore any weird timestamps/check in times that sometimes show up when starting playback and seeking
+        # todo: fix this absolute mess
+        failedCheck = True
+        if sessionId in active_sessions:
+            cachedLastPlaybackTime, cachedPositionTicks = active_sessions[sessionId]
+            cachedLastPlaybackTimeDiff = lastPlaybackTime - cachedLastPlaybackTime
+            print('diff between client check in timestamps %s' % cachedLastPlaybackTimeDiff)
+
+            posTicksDiff = position_ticks - cachedPositionTicks
+            posTimeDiff = start - cachedLastPlaybackTime
+            if cachedLastPlaybackTimeDiff.seconds < 0 or cachedLastPlaybackTimeDiff.seconds > cooldown_time + 8:
+                print('bad session continuity in check in time, ignoring')
+            elif posTicksDiff < 0 or posTicksDiff > (posTimeDiff.seconds + 2) * 1000 * TICKS_PER_MS:
+                print('bad session continuity in position time, ignoring')
+                print('posTicksDiff %s should be less than %s' % (posTicksDiff, (posTimeDiff.seconds + 2) * 1000 * TICKS_PER_MS))
+            else:
+                failedCheck = False
+        active_sessions[sessionId] = (lastPlaybackTime, position_ticks)
+
+        if failedCheck or position_ticks < start_time_ticks or position_ticks > end_time_ticks:
+            continue
+
+        if position_ticks < TICKS_PER_MS * 500:
+            print('position is less than 0.5 seconds, ignoring to prevent skipping while buffering')
             continue
 
         if end_time_ticks - start_time_ticks < minimum_intro_length * 1000 * TICKS_PER_MS:
@@ -149,6 +181,8 @@ def init_client():
 
 def monitor_loop(monitor_all_users=False):
     global should_exit
+    global active_sessions
+    global last_sessions_cull
 
     if server_url == '' or server_username == '' or server_password == '':
         print('missing server info')
@@ -164,6 +198,21 @@ def monitor_loop(monitor_all_users=False):
     while not should_exit:
         if not monitor_sessions(monitor_all_users) and not should_exit:
             init_client()
+        currTime = datetime.now(timezone.utc)
+        sessionCullTimeDiff = currTime - last_sessions_cull
+        if sessionCullTimeDiff.seconds > SESSIONS_CULL_COOLDOWN:
+            print('\nchecking for stale sessions')
+            sessionsToRemove = []
+            for sessionId in active_sessions:
+                cachedLastPlaybackTime, cachedPositionTicks = active_sessions[sessionId]
+                playbackCheckinDiff = currTime - cachedLastPlaybackTime
+                if playbackCheckinDiff.seconds > SESSION_CULL_STALE_AGE:
+                    sessionsToRemove.append(sessionId)
+            for sessionToRemove in sessionsToRemove:
+                if sessionToRemove in active_sessions:
+                    active_sessions.pop(sessionToRemove)
+                    print('removed stale session %s' % sessionId)
+            last_sessions_cull = datetime.now(timezone.utc)
         sleep(cooldown_time)
 
     if client is not None:
