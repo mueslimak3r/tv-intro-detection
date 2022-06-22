@@ -4,7 +4,7 @@ charset-normalizer==2.0.12
 idna==3.3
 ImageHash==4.2.1
 jellyfin-apiclient-python==1.8.1
-numpy==1.21.5
+numpy==1.22.0
 opencv-python==4.5.5.64
 pandas==1.4.1
 Pillow==9.0.1
