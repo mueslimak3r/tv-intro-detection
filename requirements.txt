@@ -1,7 +1,7 @@
 arrow==1.2.2
 certifi==2023.7.22
 charset-normalizer==2.0.12
-idna==3.3
+idna==3.7
 ImageHash==4.2.1
 jellyfin-apiclient-python==1.8.1
 numpy==1.22.0
